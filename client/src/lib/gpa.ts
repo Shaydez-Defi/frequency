@@ -1,0 +1,28 @@
+// UI adapter over the shared calculation modules.
+// All math and mappings live in @cgpa-app/shared; nothing is duplicated here.
+import { calcCgpa, calcSemester } from '@cgpa-app/shared/calc';
+import { classifyCgpa } from '@cgpa-app/shared/classification';
+import type { Course, Semester } from '../types';
+
+export interface Totals {
+  units: number;
+  qualityPoints: number;
+  gpa: number;
+}
+
+export function totals(courses: Course[]): Totals {
+  const r = calcSemester(courses);
+  return { units: r.totalUnits, qualityPoints: r.totalPoints, gpa: r.gp ?? 0 };
+}
+
+/** Cumulative CGPA across every saved semester. */
+export function cgpa(semesters: Semester[]): number {
+  const r = calcCgpa(semesters.map((s) => calcSemester(s.courses)));
+  return r.gp ?? 0;
+}
+
+export function classify(cgpaValue: number): string {
+  return classifyCgpa(cgpaValue);
+}
+
+export const fmt = (n: number, digits = 2): string => n.toFixed(digits);
