@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { changePasswordSchema, updateProfileSchema } from '@cgpa-app/shared/schemas';
+import { changePasswordSchema, updateProfileSchema } from '@frequency/shared/schemas';
 
 describe('updateProfileSchema', () => {
   test('accepts name and/or department edits, never a registration number', () => {

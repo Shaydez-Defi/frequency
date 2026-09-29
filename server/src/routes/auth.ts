@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { loginSchema, registerSchema, updateProfileSchema, changePasswordSchema } from '@cgpa-app/shared/schemas';
+import { loginSchema, registerSchema, updateProfileSchema, changePasswordSchema } from '@frequency/shared/schemas';
 import { queryGet, queryRun } from '../db.js';
 import { clearAuthCookie, requireAuth, setAuthCookie, signToken } from '../auth.js';
 

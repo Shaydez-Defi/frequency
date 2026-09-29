@@ -71,9 +71,9 @@ export function Review() {
 
       <div className="statgrid">
         <Stat label="Courses" value={parsed.length} />
-        <Stat label="Credit Units" value={t?.units ?? '—'} />
-        <Stat label="Quality Points" value={t ? t.qualityPoints : '—'} />
-        <Stat label="GPA" value={t ? fmt(t.gpa) : '—'} highlighted />
+        <Stat label="Credit Units" value={t?.units ?? '-'} />
+        <Stat label="Quality Points" value={t ? t.qualityPoints : '-'} />
+        <Stat label="GPA" value={t ? fmt(t.gpa) : '-'} highlighted />
       </div>
 
       <div className="sect" style={{ marginTop: 4 }}>

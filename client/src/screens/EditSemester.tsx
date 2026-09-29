@@ -4,7 +4,7 @@ import { ApiError, api } from '../lib/api.js';
 import type { CoursePayload } from '../lib/api.js';
 import { GRADES } from '../types.js';
 import type { Grade } from '../types.js';
-import { courseSchema } from '@cgpa-app/shared/schemas';
+import { courseSchema } from '@frequency/shared/schemas';
 import { BackBar, EmptyState } from '../components/ui.js';
 
 interface Row {
@@ -161,7 +161,7 @@ export function EditSemester() {
                   <button type="button" onClick={() => shiftUnits(i, -1)} aria-label="Decrease credit units">
                     −
                   </button>
-                  <span className="mini-step__v num">{row.units === '' ? '–' : row.units}</span>
+                  <span className="mini-step__v num">{row.units === '' ? '-' : row.units}</span>
                   <button type="button" onClick={() => shiftUnits(i, +1)} aria-label="Increase credit units">
                     +
                   </button>

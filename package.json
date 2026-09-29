@@ -1,8 +1,8 @@
 {
-  "name": "cgpa-app",
+  "name": "frequency",
   "version": "0.1.0",
   "private": true,
-  "description": "Student academic performance web app - GP/CGPA tracker (V1 foundation)",
+  "description": "Frequency - student academic performance web app (GP/CGPA tracker)",
   "workspaces": [
     "client",
     "server",

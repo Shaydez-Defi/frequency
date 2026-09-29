@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { classifyCgpa } from '@cgpa-app/shared/classification';
+import { classifyCgpa } from '@frequency/shared/classification';
 
 describe('classifyCgpa', () => {
   test('maps the 5.0 scale to degree classes', () => {

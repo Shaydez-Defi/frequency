@@ -63,7 +63,7 @@ export function CourseRow({
   return (
     <div className="rrow">
       <div>
-        <div className="rrow__code">{code || '—'}</div>
+        <div className="rrow__code">{code || '-'}</div>
         <div className="rrow__meta">
           {title || 'Untitled'}
           {meta ? ` · ${meta}` : ''}

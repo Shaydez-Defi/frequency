@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GRADES } from '../types.js';
 import type { Grade } from '../types.js';
-import { courseSchema } from '@cgpa-app/shared/schemas';
+import { courseSchema } from '@frequency/shared/schemas';
 import { useDraft } from '../semesters/draft.js';
 import { BackBar } from '../components/ui.js';
 
@@ -72,7 +72,7 @@ export function CourseEntry() {
               <button type="button" onClick={() => adjustUnits(i, -1)} aria-label="Decrease credit units">
                 −
               </button>
-              <span className="mini-step__v num">{c.units === '' ? '–' : c.units}</span>
+              <span className="mini-step__v num">{c.units === '' ? '-' : c.units}</span>
               <button type="button" onClick={() => adjustUnits(i, +1)} aria-label="Increase credit units">
                 +
               </button>

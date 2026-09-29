@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { courseCountSchema, courseSchema, createSemesterSchema } from '@cgpa-app/shared/schemas';
+import { courseCountSchema, courseSchema, createSemesterSchema } from '@frequency/shared/schemas';
 
 describe('courseSchema', () => {
   test('accepts a complete valid course', () => {

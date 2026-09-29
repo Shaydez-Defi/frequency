@@ -1,5 +1,5 @@
 {
-  "name": "@cgpa-app/server",
+  "name": "@frequency/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cgpa-app/shared": "0.1.0",
+    "@frequency/shared": "0.1.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",

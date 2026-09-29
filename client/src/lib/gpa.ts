@@ -1,7 +1,7 @@
 // UI adapter over the shared calculation modules.
-// All math and mappings live in @cgpa-app/shared; nothing is duplicated here.
-import { calcCgpa, calcSemester } from '@cgpa-app/shared/calc';
-import { classifyCgpa } from '@cgpa-app/shared/classification';
+// All math and mappings live in @frequency/shared; nothing is duplicated here.
+import { calcCgpa, calcSemester } from '@frequency/shared/calc';
+import { classifyCgpa } from '@frequency/shared/classification';
 import type { Course, Semester } from '../types';
 
 export interface Totals {

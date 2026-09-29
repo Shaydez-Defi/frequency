@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { calcCgpa, calcSemester, formatGp } from '@cgpa-app/shared/calc';
+import { calcCgpa, calcSemester, formatGp } from '@frequency/shared/calc';
 
 describe('calcSemester', () => {
   test('computes GP as quality points over units', () => {
@@ -50,6 +50,6 @@ describe('calcCgpa', () => {
 describe('formatGp', () => {
   test('rounds display to two decimals and guards null', () => {
     expect(formatGp(4.66666)).toBe('4.67');
-    expect(formatGp(null)).toBe('—');
+    expect(formatGp(null)).toBe('-');
   });
 });

@@ -20,7 +20,7 @@ export function Dashboard() {
     api
       .semesters()
       .then((r) => {
-        // Most recent first, ordered by save time — never hardcoded.
+        // Most recent first, ordered by save time, never hardcoded.
         setSemesters(newestFirst(r.semesters.map(toSavedSemester)));
         setCgpa(r.cgpa);
       })

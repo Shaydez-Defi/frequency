@@ -1,6 +1,6 @@
-# CGPA App — V1 (auth + dashboard + GP flow)
+# Frequency - V1 (auth + dashboard + GP flow)
 
-GP·CGPA student tracker. Cream/deep-teal/orange mobile-first UI (430px shell,
+Frequency student tracker. Cream/deep-teal/orange mobile-first UI (430px shell,
 widening to 640px on tablets and 780px on desktops),
 TypeScript + React throughout.
 
@@ -14,7 +14,7 @@ TypeScript + React throughout.
   file DB -> Postgres later. Auth: bcryptjs + JWT in HttpOnly cookie.
 - **shared/**: `src/gradeScale.ts` (configurable points) + `src/calc.ts` +
   `src/schemas.ts` + `src/classification.ts`, imported by both sides.
-  The client math adapter (`client/src/lib/gpa.ts`) re-exports these — no duplicated logic.
+  The client math adapter (`client/src/lib/gpa.ts`) re-exports these, no duplicated logic.
 - **db/schema.sql**: canonical schema. No ORM in V1.
 
 ## Data models
@@ -23,7 +23,7 @@ TypeScript + React throughout.
 - `semesters(id, user_id FK, level, term, total_units, total_points, gp, UNIQUE(user_id, level, term))`
 - `courses(id, semester_id FK, code, title?, units, grade, quality_points)`
 
-Relations: user 1—N semesters, semester 1—N courses. Course rows are always saved.
+Relations: user 1-N semesters, semester 1-N courses. Course rows are always saved.
 No seed or demo records: every number on screen comes from the API.
 
 ## Calculation
@@ -58,7 +58,7 @@ per-course points, Edit (add/remove supported, server recalculates) and Delete
 ## Run
 
 - `npm install` (root, workspaces)
-- `npm run dev:server` (port 5000, needs `JWT_SECRET` — see `.env.example`)
+- `npm run dev:server` (port 5000, needs `JWT_SECRET` - see `.env.example`)
 - `npm run dev:client` (port 5173, proxies /api)
 
 ## Test

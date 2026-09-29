@@ -54,7 +54,7 @@ export function Result() {
         <div className="resdiv" />
         <div className="rescg">
           <div className="rescg__k">Cumulative CGPA</div>
-          <div className="rescg__v num">{loading ? '…' : cgpa !== null ? fmt(cgpa) : '—'}</div>
+          <div className="rescg__v num">{loading ? '…' : cgpa !== null ? fmt(cgpa) : '-'}</div>
         </div>
         {cgpa === null && !loading && (
           <p className="form-error" role="alert">Could not load your cumulative CGPA.</p>

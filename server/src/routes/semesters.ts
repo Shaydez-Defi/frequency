@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
-import { calcCgpa, calcSemester } from '@cgpa-app/shared/calc';
-import { GRADE_POINTS } from '@cgpa-app/shared/gradeScale';
-import { createSemesterSchema } from '@cgpa-app/shared/schemas';
+import { calcCgpa, calcSemester } from '@frequency/shared/calc';
+import { GRADE_POINTS } from '@frequency/shared/gradeScale';
+import { createSemesterSchema } from '@frequency/shared/schemas';
 import { db, queryAll, queryGet, queryRun } from '../db.js';
 import { requireAuth } from '../auth.js';
 

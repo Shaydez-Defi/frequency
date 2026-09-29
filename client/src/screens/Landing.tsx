@@ -5,7 +5,7 @@ export function Landing() {
   return (
     <section className="scr">
       <div className="nav">
-        <span className="wordmark">GP·CGPA</span>
+        <span className="wordmark">Frequency</span>
         <span className="navlinks">
           <span>HOME</span>
           <span>ABOUT</span>
@@ -15,13 +15,11 @@ export function Landing() {
       </div>
 
       <h1 className="hero-h">
-        Calculate.
+        Track your GP and CGPA,
         <br />
-        Track.
-        <br />
-        Know your CGPA.
+        semester by semester.
       </h1>
-      <p className="hero-p">Your academic performance, organized in one place.</p>
+      <p className="hero-p">Enter your courses once, and Frequency keeps the record.</p>
 
       <Link className="btn btn--primary" to="/register" style={{ textDecoration: 'none' }}>
         Get Started
@@ -43,7 +41,7 @@ export function Landing() {
       </div>
 
       <p className="poweredby">Powered by Eze Munachimso Gideon</p>
-      <p className="foot">Built by Shaydez · © 2026 · 2026–2027 Agric Elections</p>
+      <p className="foot">Built by Shaydez · © 2026 · 2026-2027 Agric Elections</p>
     </section>
   );
 }

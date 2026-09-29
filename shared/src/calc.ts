@@ -49,6 +49,6 @@ export function calcCgpa(semesters: SemesterTotals[]): SemesterTotals {
 
 // Display-only rounding. Storage keeps full precision.
 export function formatGp(value: number | null): string {
-  if (value === null || Number.isNaN(value)) return '—';
+  if (value === null || Number.isNaN(value)) return '-';
   return value.toFixed(2);
 }
