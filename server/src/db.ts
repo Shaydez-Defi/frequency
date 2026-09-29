@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DatabaseSync } from 'node:sqlite';
 import { Pool } from '@neondatabase/serverless';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -24,28 +23,47 @@ interface PgClient {
 }
 
 // ---- SQLite (local dev + tests): zero-config file database ----
-const sqlite = !isPostgres
-  ? new DatabaseSync(rawUrl.replace(/^file:/, '') || join(here, '..', 'dev.db'))
-  : null;
+// node:sqlite is imported lazily so serverless runtimes that lack the
+// builtin never pay for it (the Postgres path never touches it).
+interface SqliteDb {
+  exec(sql: string): void;
+  prepare(sql: string): {
+    all(...params: unknown[]): Array<Record<string, unknown>>;
+    get(...params: unknown[]): Record<string, unknown> | undefined;
+    run(...params: unknown[]): void;
+  };
+}
 
-if (sqlite) {
-  sqlite.exec('PRAGMA foreign_keys = ON');
-  sqlite.exec(readFileSync(join(here, '..', '..', 'db', 'schema.sql'), 'utf8'));
-  const cols = sqlite.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
-  if (!cols.some((c) => c.name === 'department')) {
-    sqlite.exec(`ALTER TABLE users ADD COLUMN department TEXT NOT NULL DEFAULT ''`);
+let sqlite: SqliteDb | null = null;
+
+async function sqliteConn(): Promise<SqliteDb> {
+  if (!sqlite) {
+    const { DatabaseSync } = await import('node:sqlite');
+    const dbPath = rawUrl.replace(/^file:/, '') || join(here, '..', 'dev.db');
+    const db = new DatabaseSync(dbPath) as unknown as SqliteDb;
+    db.exec('PRAGMA foreign_keys = ON');
+    db.exec(readFileSync(join(here, '..', '..', 'db', 'schema.sql'), 'utf8'));
+    const cols = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === 'department')) {
+      db.exec(`ALTER TABLE users ADD COLUMN department TEXT NOT NULL DEFAULT ''`);
+    }
+    sqlite = db;
   }
+  return sqlite;
 }
 
 const sqliteDb: Db = {
   all: async <T>(sql: string, ...params: SqlParam[]): Promise<T[]> => {
-    return sqlite!.prepare(sql).all(...params) as unknown as T[];
+    const db = await sqliteConn();
+    return db.prepare(sql).all(...params) as unknown as T[];
   },
   get: async <T>(sql: string, ...params: SqlParam[]): Promise<T | undefined> => {
-    return sqlite!.prepare(sql).get(...params) as unknown as T | undefined;
+    const db = await sqliteConn();
+    return db.prepare(sql).get(...params) as unknown as T | undefined;
   },
   run: async (sql: string, ...params: SqlParam[]): Promise<void> => {
-    sqlite!.prepare(sql).run(...params);
+    const db = await sqliteConn();
+    db.prepare(sql).run(...params);
   }
 };
 
@@ -108,13 +126,14 @@ export const queryRun = (sql: string, ...params: SqlParam[]): Promise<void> => d
 
 export async function withTransaction<T>(fn: (tx: Db) => Promise<T>): Promise<T> {
   if (!isPostgres) {
-    sqlite!.exec('BEGIN');
+    const db = await sqliteConn();
+    db.exec('BEGIN');
     try {
       const result = await fn(sqliteDb);
-      sqlite!.exec('COMMIT');
+      db.exec('COMMIT');
       return result;
     } catch (err) {
-      sqlite!.exec('ROLLBACK');
+      db.exec('ROLLBACK');
       throw err;
     }
   }
