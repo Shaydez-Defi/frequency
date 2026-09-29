@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GRADES } from '../types.js';
-import type { Grade } from '../types.js';
 import { courseSchema } from '@frequency/shared/schemas';
 import { useDraft } from '../semesters/draft.js';
+import { Select } from '../components/Select.js';
 import { BackBar } from '../components/ui.js';
 
 export function CourseEntry() {
@@ -78,17 +78,15 @@ export function CourseEntry() {
               </button>
               <span className="mini-step__lbl">Credit Units</span>
             </div>
-            <select
-              className="grade"
+            <Select
+              compact
+              label={`Course ${i + 1} grade`}
+              labelHidden
+              placeholder="Grade"
               value={c.grade}
-              onChange={(e) => updateCourse(i, { grade: e.target.value })}
-              aria-label={`Course ${i + 1} grade`}
-            >
-              <option value="">Grade</option>
-              {GRADES.map((g: Grade) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
+              options={GRADES}
+              onChange={(v) => updateCourse(i, { grade: v })}
+            />
           </div>
         </div>
       ))}

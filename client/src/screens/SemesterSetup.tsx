@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LEVELS, SEMESTERS } from '../types.js';
 import { useDraft } from '../semesters/draft.js';
+import { Select } from '../components/Select.js';
 import { BackBar } from '../components/ui.js';
 
 function baseLevel(label: string): string {
@@ -41,20 +42,10 @@ export function SemesterSetup() {
       </div>
 
       <div className="field">
-        <label htmlFor="st-level">Level</label>
-        <select id="st-level" value={levelLabel} onChange={(e) => setLevelLabel(e.target.value)}>
-          {LEVELS.map((l) => (
-            <option key={l}>{l}</option>
-          ))}
-        </select>
+        <Select label="Level" value={levelLabel} options={LEVELS} onChange={setLevelLabel} />
       </div>
       <div className="field">
-        <label htmlFor="st-sem">Semester</label>
-        <select id="st-sem" value={semester} onChange={(e) => setSemester(e.target.value)}>
-          {SEMESTERS.map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
+        <Select label="Semester" value={semester} options={SEMESTERS} onChange={setSemester} />
       </div>
 
       <div className="dots" aria-hidden>

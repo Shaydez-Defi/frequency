@@ -6,12 +6,6 @@ export function Landing() {
     <section className="scr">
       <div className="nav">
         <span className="wordmark">Frequency</span>
-        <span className="navlinks">
-          <span>HOME</span>
-          <span>ABOUT</span>
-          <span>PRODUCT</span>
-          <span>CONTACT</span>
-        </span>
       </div>
 
       <h1 className="hero-h">
@@ -40,8 +34,8 @@ export function Landing() {
         <div className="dotc dotc--2" />
       </div>
 
-      <p className="poweredby">Powered by Eze Munachimso Gideon</p>
-      <p className="foot">Built by Shaydez · © 2026 · 2026-2027 Agric Elections</p>
+      <p className="poweredby">Built by Shaydez</p>
+      <p className="foot">© 2026 Frequency</p>
     </section>
   );
 }

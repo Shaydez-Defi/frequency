@@ -57,11 +57,11 @@ body { margin: 0; }
 
 .field { margin-bottom: 14px; }
 .field label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
-.field input, .field select, .ccard__input {
+.field input, .ccard__input {
   width: 100%; padding: 12px 14px; border: 1px solid var(--line);
   border-radius: 10px; background: #fff; font-size: 15px; outline: none; color: var(--ink);
 }
-.field input:focus, .field select:focus, .ccard__input:focus { border-color: var(--teal); }
+.field input:focus, .ccard__input:focus { border-color: var(--teal); }
 .form-error { color: var(--danger); font-size: 13.5px; margin: 4px 0 10px; }
 
 .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
@@ -74,8 +74,7 @@ body { margin: 0; }
 
 /* landing */
 .nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 44px; }
-.wordmark { font-weight: 500; font-size: 17px; color: var(--teal); }
-.navlinks { display: flex; gap: 14px; font-size: 11px; letter-spacing: 0.08em; color: var(--ink-2); }
+.wordmark { font-weight: 700; font-size: 22px; letter-spacing: -0.01em; color: var(--teal); }
 
 .hero-h { font-size: 34px; line-height: 1.15; font-weight: 500; color: var(--teal); margin: 0 0 14px; }
 .hero-p { font-size: 16px; line-height: 24px; color: var(--ink-2); max-width: 300px; margin: 0 0 26px; }
@@ -147,7 +146,38 @@ body { margin: 0; }
 .mini-step button { width: 28px; height: 28px; min-width: 28px; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); cursor: pointer; font-size: 16px; color: var(--teal); }
 .mini-step__v { font-weight: 500; min-width: 16px; text-align: center; }
 .mini-step__lbl { font-size: 12px; color: var(--ink-2); }
-.grade { width: 96px; min-width: 96px; }
+
+/* custom dropdown (replaces the native select popup) */
+.select { position: relative; }
+.select__label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+.select__btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px;
+  background: #fff; font-size: 16px; color: var(--ink); cursor: pointer;
+}
+.select__btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.select__placeholder { color: var(--ink-2); }
+.select__chev { color: var(--ink-2); flex-shrink: 0; transition: transform 0.15s ease-out; }
+.select__chev--open { transform: rotate(180deg); }
+.select__panel {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 10;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 6px; margin: 0; list-style: none; max-height: 232px; overflow: auto;
+  box-shadow: 0 12px 28px rgba(18, 59, 51, 0.14);
+  animation: popIn 0.16s ease-out;
+}
+.select__panel li { margin: 0; padding: 0; }
+.select__opt {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 11px 12px; border: 0; border-radius: 8px; background: none;
+  font-size: 15px; color: var(--ink); cursor: pointer; text-align: left;
+}
+.select__opt:hover { background: var(--paper); }
+.select__opt--on { background: rgba(29, 91, 75, 0.1); color: var(--teal); font-weight: 600; }
+.select--sm { width: 96px; min-width: 96px; }
+.select--sm .select__btn { padding: 12px 10px; font-size: 15px; }
+@keyframes popIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .coursefoot { display: flex; align-items: center; gap: 14px; margin-top: 18px; padding: 14px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
 .coursefoot__tt { font-size: 13px; color: var(--ink-2); }
@@ -207,7 +237,6 @@ body { margin: 0; }
 
 /* 16px inputs stop iOS auto-zoom on focus */
 .field input,
-.field select,
 .ccard__input {
   font-size: 16px;
 }
@@ -229,7 +258,9 @@ body { margin: 0; }
 .calc-card:focus-visible,
 .semrow:focus-visible,
 .stepper button:focus-visible,
-.mini-step button:focus-visible {
+.mini-step button:focus-visible,
+.select__btn:focus-visible,
+.select__opt:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 2px;
 }
@@ -310,9 +341,10 @@ body { margin: 0; }
 .mini-step button { width: 32px; height: 32px; min-width: 32px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .scr { animation: none; }
+  .scr, .dlg, .select__panel { animation: none; }
   .btn, .backbtn, .avatar, .plusbtn, .calc-card, .semrow,
-  .stepper button, .mini-step button, .dots i, .gpill, .cgpacard__cls {
+  .stepper button, .mini-step button, .dots i, .gpill, .cgpacard__cls,
+  .select__chev {
     transition: none;
   }
   .btn:active, .calc-card:active, .backbtn:active, .avatar:active,

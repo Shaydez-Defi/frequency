@@ -3,8 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError, api } from '../lib/api.js';
 import type { CoursePayload } from '../lib/api.js';
 import { GRADES } from '../types.js';
-import type { Grade } from '../types.js';
 import { courseSchema } from '@frequency/shared/schemas';
+import { Select } from '../components/Select.js';
 import { BackBar, EmptyState } from '../components/ui.js';
 
 interface Row {
@@ -167,17 +167,15 @@ export function EditSemester() {
                   </button>
                   <span className="mini-step__lbl">Credit Units</span>
                 </div>
-                <select
-                  className="grade"
+                <Select
+                  compact
+                  label={`Course ${i + 1} grade`}
+                  labelHidden
+                  placeholder="Grade"
                   value={row.grade}
-                  onChange={(e) => update(i, { grade: e.target.value })}
-                  aria-label={`Course ${i + 1} grade`}
-                >
-                  <option value="">Grade</option>
-                  {GRADES.map((g: Grade) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </select>
+                  options={GRADES}
+                  onChange={(v) => update(i, { grade: v })}
+                />
               </div>
               {tried && rowErrors[i].length > 0 && (
                 <ul className="form-error" style={{ paddingLeft: 18, marginBottom: 0 }}>
