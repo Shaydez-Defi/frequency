@@ -2,6 +2,7 @@
   "name": "frequency",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Frequency - student academic performance web app (GP/CGPA tracker)",
   "workspaces": [
     "client",
