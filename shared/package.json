@@ -3,11 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
   "exports": {
-    ".": "./src/index.ts",
-    "./gradeScale": "./src/gradeScale.ts",
-    "./calc": "./src/calc.ts",
-    "./schemas": "./src/schemas.ts",
-    "./classification": "./src/classification.ts"
+    ".": "./dist/index.js",
+    "./gradeScale": "./dist/gradeScale.js",
+    "./calc": "./dist/calc.js",
+    "./schemas": "./dist/schemas.js",
+    "./classification": "./dist/classification.js"
   }
 }

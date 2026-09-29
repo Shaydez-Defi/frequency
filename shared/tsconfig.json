@@ -4,6 +4,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+    "declaration": true,
+    "outDir": "dist",
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src"]
 }
