@@ -61,6 +61,15 @@ per-course points, Edit (add/remove supported, server recalculates) and Delete
 - `npm run dev:server` (port 5000, needs `JWT_SECRET` - see `.env.example`)
 - `npm run dev:client` (port 5173, proxies /api)
 
+## Deploy (Vercel)
+
+- `vercel.json` builds the server (`tsc` emit) and client, serves `client/dist`,
+  runs the Express app as a serverless function (`api/[[...all]].ts`), and falls
+  back to `index.html` for app routes.
+- Local dev and tests use SQLite (`file:` URL). Any `postgres` URL (Vercel
+  Postgres provides `POSTGRES_URL`) switches the same queries to Neon Postgres,
+  including transactional semester saves. Set `JWT_SECRET` in project env.
+
 ## Test
 
 - `npm test` (vitest: calc + validation + classification + profile/password units,

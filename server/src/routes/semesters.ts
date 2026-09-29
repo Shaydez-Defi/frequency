@@ -3,7 +3,9 @@ import { Router } from 'express';
 import { calcCgpa, calcSemester } from '@frequency/shared/calc';
 import { GRADE_POINTS } from '@frequency/shared/gradeScale';
 import { createSemesterSchema } from '@frequency/shared/schemas';
-import { db, queryAll, queryGet, queryRun } from '../db.js';
+import { queryAll, queryGet, queryRun, withTransaction } from '../db.js';
+import type { Db } from '../db.js';
+import { ah } from '../ah.js';
 import { requireAuth } from '../auth.js';
 
 interface SemesterRow {
@@ -34,7 +36,8 @@ function userId(req: unknown): string {
   return (req as { user: { id: string } }).user.id;
 }
 
-function withCourses(s: SemesterRow) {
+async function withCourses(s: SemesterRow, tx?: Db) {
+  const get = tx ? tx.all<CourseRow> : queryAll<CourseRow>;
   return {
     id: s.id,
     level: s.level,
@@ -43,167 +46,182 @@ function withCourses(s: SemesterRow) {
     totalPoints: s.total_points,
     gp: s.gp,
     createdAt: s.created_at,
-    courses: queryAll<CourseRow>('SELECT * FROM courses WHERE semester_id = ?', s.id)
+    courses: await get('SELECT * FROM courses WHERE semester_id = ?', s.id)
   };
 }
 
-semestersRouter.get('/', (req, res) => {
-  const id = userId(req);
-  const semesters = queryAll<SemesterRow>('SELECT * FROM semesters WHERE user_id = ? ORDER BY created_at ASC', id);
-  const withCoursesList = semesters.map(withCourses);
-  const cgpa = calcCgpa(withCoursesList.map((s) => ({ totalUnits: s.totalUnits, totalPoints: s.totalPoints, gp: s.gp })));
-  res.json({
-    semesters: withCoursesList,
-    cgpa: cgpa.gp,
-    totalUnits: cgpa.totalUnits,
-    totalPoints: cgpa.totalPoints
-  });
-});
-
-semestersRouter.post('/', (req, res) => {
-  const parsed = createSemesterSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: 'Check semester fields.', details: parsed.error.flatten().fieldErrors });
-    return;
-  }
-  const id = userId(req);
-  const { level, term, courses } = parsed.data;
-  let totals;
-  try {
-    totals = calcSemester(courses);
-  } catch (e) {
-    res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid calculation.' });
-    return;
-  }
-  if (totals.gp === null) {
-    res.status(400).json({ error: 'Add at least one course with valid units.' });
-    return;
-  }
-  const dupe = queryGet<{ id: string }>(
-    'SELECT id FROM semesters WHERE user_id = ? AND level = ? AND term = ?',
-    id,
-    level.trim(),
-    term.trim()
-  );
-  if (dupe) {
-    res.status(409).json({ error: 'This level and semester is already recorded. Open it to edit instead.' });
-    return;
-  }
-  const semesterId = randomUUID();
-  queryRun(
-    'INSERT INTO semesters (id, user_id, level, term, total_units, total_points, gp) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    semesterId,
-    id,
-    level.trim(),
-    term.trim(),
-    totals.totalUnits,
-    totals.totalPoints,
-    totals.gp
-  );
-  for (const c of courses) {
-    const grade = c.grade.toUpperCase();
-    queryRun(
-      'INSERT INTO courses (id, semester_id, code, title, units, grade, quality_points) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      randomUUID(),
-      semesterId,
-      c.code.trim().toUpperCase(),
-      c.title?.trim() || null,
-      c.units,
-      grade,
-      c.units * GRADE_POINTS[grade]
-    );
-  }
-  res.status(201).json({ id: semesterId, gp: totals.gp, totalUnits: totals.totalUnits });
-});
-
-function ownedSemester(uid: string, sid: string): SemesterRow | undefined {
-  return queryGet<SemesterRow>('SELECT * FROM semesters WHERE id = ? AND user_id = ?', sid, uid);
-}
-
-semestersRouter.get('/:id', (req, res) => {
-  const found = ownedSemester(userId(req), req.params.id);
-  if (!found) {
-    res.status(404).json({ error: 'Semester not found.' });
-    return;
-  }
-  res.json({ semester: withCourses(found) });
-});
-
-semestersRouter.put('/:id', (req, res) => {
-  const uid = userId(req);
-  const existing = ownedSemester(uid, req.params.id);
-  if (!existing) {
-    res.status(404).json({ error: 'Semester not found.' });
-    return;
-  }
-  const parsed = createSemesterSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: 'Check semester fields.', details: parsed.error.flatten().fieldErrors });
-    return;
-  }
-  const { level, term, courses } = parsed.data;
-  let totals;
-  try {
-    totals = calcSemester(courses);
-  } catch (e) {
-    res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid calculation.' });
-    return;
-  }
-  if (totals.gp === null) {
-    res.status(400).json({ error: 'Add at least one course with valid units.' });
-    return;
-  }
-  const dupe = queryGet<{ id: string }>(
-    'SELECT id FROM semesters WHERE user_id = ? AND level = ? AND term = ? AND id != ?',
-    uid,
-    level.trim(),
-    term.trim(),
-    existing.id
-  );
-  if (dupe) {
-    res.status(409).json({ error: 'Another saved semester already uses this level and semester.' });
-    return;
-  }
-  // Client-supplied GP/totals are ignored: everything below is derived server-side.
-  db.exec('BEGIN');
-  try {
-    queryRun(
-      'UPDATE semesters SET level = ?, term = ?, total_units = ?, total_points = ?, gp = ? WHERE id = ?',
-      level.trim(),
-      term.trim(),
-      totals.totalUnits,
-      totals.totalPoints,
-      totals.gp,
-      existing.id
-    );
-    queryRun('DELETE FROM courses WHERE semester_id = ?', existing.id);
-    for (const c of courses) {
+function insertCourses(
+  tx: Db,
+  semesterId: string,
+  courses: Array<{ code: string; title?: string; units: number; grade: string }>
+) {
+  return Promise.all(
+    courses.map((c) => {
       const grade = c.grade.toUpperCase();
-      queryRun(
+      return tx.run(
         'INSERT INTO courses (id, semester_id, code, title, units, grade, quality_points) VALUES (?, ?, ?, ?, ?, ?, ?)',
         randomUUID(),
-        existing.id,
+        semesterId,
         c.code.trim().toUpperCase(),
         c.title?.trim() || null,
         c.units,
         grade,
         c.units * GRADE_POINTS[grade]
       );
-    }
-    db.exec('COMMIT');
-  } catch {
-    db.exec('ROLLBACK');
-    throw new Error('Could not save the edited semester.');
-  }
-  res.json({ id: existing.id, gp: totals.gp, totalUnits: totals.totalUnits });
-});
+    })
+  );
+}
 
-semestersRouter.delete('/:id', (req, res) => {
-  const existing = ownedSemester(userId(req), req.params.id);
-  if (!existing) {
-    res.status(404).json({ error: 'Semester not found.' });
-    return;
-  }
-  queryRun('DELETE FROM semesters WHERE id = ?', existing.id);
-  res.json({ ok: true });
-});
+semestersRouter.get(
+  '/',
+  ah(async (req, res) => {
+    const id = userId(req);
+    const semesters = await queryAll<SemesterRow>(
+      'SELECT * FROM semesters WHERE user_id = ? ORDER BY created_at ASC',
+      id
+    );
+    const withCoursesList = await Promise.all(semesters.map((s) => withCourses(s)));
+    const cgpa = calcCgpa(
+      withCoursesList.map((s) => ({ totalUnits: s.totalUnits, totalPoints: s.totalPoints, gp: s.gp }))
+    );
+    res.json({
+      semesters: withCoursesList,
+      cgpa: cgpa.gp,
+      totalUnits: cgpa.totalUnits,
+      totalPoints: cgpa.totalPoints
+    });
+  })
+);
+
+semestersRouter.post(
+  '/',
+  ah(async (req, res) => {
+    const parsed = createSemesterSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Check semester fields.', details: parsed.error.flatten().fieldErrors });
+      return;
+    }
+    const id = userId(req);
+    const { level, term, courses } = parsed.data;
+    let totals;
+    try {
+      totals = calcSemester(courses);
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid calculation.' });
+      return;
+    }
+    if (totals.gp === null) {
+      res.status(400).json({ error: 'Add at least one course with valid units.' });
+      return;
+    }
+    const dupe = await queryGet<{ id: string }>(
+      'SELECT id FROM semesters WHERE user_id = ? AND level = ? AND term = ?',
+      id,
+      level.trim(),
+      term.trim()
+    );
+    if (dupe) {
+      res.status(409).json({ error: 'This level and semester is already recorded. Open it to edit instead.' });
+      return;
+    }
+    const semesterId = randomUUID();
+    await withTransaction(async (tx) => {
+      await tx.run(
+        'INSERT INTO semesters (id, user_id, level, term, total_units, total_points, gp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        semesterId,
+        id,
+        level.trim(),
+        term.trim(),
+        totals.totalUnits,
+        totals.totalPoints,
+        totals.gp as number
+      );
+      await insertCourses(tx, semesterId, courses);
+    });
+    res.status(201).json({ id: semesterId, gp: totals.gp, totalUnits: totals.totalUnits });
+  })
+);
+
+async function ownedSemester(uid: string, sid: string): Promise<SemesterRow | undefined> {
+  return queryGet<SemesterRow>('SELECT * FROM semesters WHERE id = ? AND user_id = ?', sid, uid);
+}
+
+semestersRouter.get(
+  '/:id',
+  ah(async (req, res) => {
+    const found = await ownedSemester(userId(req), req.params.id);
+    if (!found) {
+      res.status(404).json({ error: 'Semester not found.' });
+      return;
+    }
+    res.json({ semester: await withCourses(found) });
+  })
+);
+
+semestersRouter.put(
+  '/:id',
+  ah(async (req, res) => {
+    const uid = userId(req);
+    const existing = await ownedSemester(uid, req.params.id);
+    if (!existing) {
+      res.status(404).json({ error: 'Semester not found.' });
+      return;
+    }
+    const parsed = createSemesterSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Check semester fields.', details: parsed.error.flatten().fieldErrors });
+      return;
+    }
+    const { level, term, courses } = parsed.data;
+    let totals;
+    try {
+      totals = calcSemester(courses);
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid calculation.' });
+      return;
+    }
+    if (totals.gp === null) {
+      res.status(400).json({ error: 'Add at least one course with valid units.' });
+      return;
+    }
+    const dupe = await queryGet<{ id: string }>(
+      'SELECT id FROM semesters WHERE user_id = ? AND level = ? AND term = ? AND id != ?',
+      uid,
+      level.trim(),
+      term.trim(),
+      existing.id
+    );
+    if (dupe) {
+      res.status(409).json({ error: 'Another saved semester already uses this level and semester.' });
+      return;
+    }
+    // Client-supplied GP/totals are ignored: everything below is derived server-side.
+    await withTransaction(async (tx) => {
+      await tx.run(
+        'UPDATE semesters SET level = ?, term = ?, total_units = ?, total_points = ?, gp = ? WHERE id = ?',
+        level.trim(),
+        term.trim(),
+        totals.totalUnits,
+        totals.totalPoints,
+        totals.gp as number,
+        existing.id
+      );
+      await tx.run('DELETE FROM courses WHERE semester_id = ?', existing.id);
+      await insertCourses(tx, existing.id, courses);
+    });
+    res.json({ id: existing.id, gp: totals.gp, totalUnits: totals.totalUnits });
+  })
+);
+
+semestersRouter.delete(
+  '/:id',
+  ah(async (req, res) => {
+    const existing = await ownedSemester(userId(req), req.params.id);
+    if (!existing) {
+      res.status(404).json({ error: 'Semester not found.' });
+      return;
+    }
+    await queryRun('DELETE FROM semesters WHERE id = ?', existing.id);
+    res.json({ ok: true });
+  })
+);
