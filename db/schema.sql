@@ -10,8 +10,13 @@ CREATE TABLE IF NOT EXISTS users (
   department TEXT NOT NULL DEFAULT '',
   reg_number TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  google_id TEXT,
+  google_email TEXT,
+  has_password INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id);
 
 CREATE TABLE IF NOT EXISTS semesters (
   id TEXT PRIMARY KEY,

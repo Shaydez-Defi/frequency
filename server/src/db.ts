@@ -44,9 +44,21 @@ async function sqliteConn(): Promise<SqliteDb> {
     db.exec('PRAGMA foreign_keys = ON');
     db.exec(readFileSync(join(here, '..', '..', 'db', 'schema.sql'), 'utf8'));
     const cols = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
-    if (!cols.some((c) => c.name === 'department')) {
+    const names = new Set(cols.map((c) => c.name));
+    if (!names.has('department')) {
       db.exec(`ALTER TABLE users ADD COLUMN department TEXT NOT NULL DEFAULT ''`);
     }
+    // Google identity linking: subject is unique when present (NULLs stay distinct).
+    if (!names.has('google_id')) {
+      db.exec(`ALTER TABLE users ADD COLUMN google_id TEXT`);
+    }
+    if (!names.has('google_email')) {
+      db.exec(`ALTER TABLE users ADD COLUMN google_email TEXT`);
+    }
+    if (!names.has('has_password')) {
+      db.exec(`ALTER TABLE users ADD COLUMN has_password INTEGER NOT NULL DEFAULT 1`);
+    }
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id)`);
     sqlite = db;
   }
   return sqlite;
@@ -95,6 +107,11 @@ async function ensurePg(): Promise<void> {
       for (const statement of schema.split(';')) {
         if (statement.trim().length > 0) await pgPool().query(statement);
       }
+      // Idempotent upgrades for databases created before Google linking existed.
+      await pgPool().query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT`);
+      await pgPool().query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email TEXT`);
+      await pgPool().query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_password INTEGER NOT NULL DEFAULT 1`);
+      await pgPool().query(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id)`);
     })();
   }
   return pgReady;

@@ -20,6 +20,9 @@ export function Profile() {
   const [passMsg, setPassMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [passBusy, setPassBusy] = useState(false);
 
+  const [googleMsg, setGoogleMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
+
   if (!user) return null;
 
   const saveProfile = async (e: FormEvent) => {
@@ -55,21 +58,40 @@ export function Profile() {
     }
     setPassBusy(true);
     try {
-      await api.changePassword({ currentPassword, newPassword, confirmPassword });
+      if (user.hasPassword) {
+        await api.changePassword({ currentPassword, newPassword, confirmPassword });
+      } else {
+        await api.setupPassword({ newPassword, confirmPassword });
+        await refresh();
+      }
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setPassMsg({ kind: 'ok', text: 'Password changed.' });
+      setPassMsg({ kind: 'ok', text: user.hasPassword ? 'Password changed.' : 'Password set. You can now log in with it.' });
     } catch (err) {
-      setPassMsg({ kind: 'error', text: err instanceof ApiError ? err.message : 'Could not change password. Try again.' });
+      setPassMsg({ kind: 'error', text: err instanceof ApiError ? err.message : 'Could not save password. Try again.' });
     } finally {
       setPassBusy(false);
     }
-  }
+  };
+
+  const onDisconnectGoogle = async () => {
+    setGoogleMsg(null);
+    setGoogleBusy(true);
+    try {
+      await api.googleDisconnect();
+      await refresh();
+      setGoogleMsg({ kind: 'ok', text: 'Google account disconnected.' });
+    } catch (err) {
+      setGoogleMsg({ kind: 'error', text: err instanceof ApiError ? err.message : 'Could not disconnect. Try again.' });
+    } finally {
+      setGoogleBusy(false);
+    }
+  };
 
   const onLogout = async () => {
     await logout();
-    navigate('/');
+    navigate('/login');
   };
 
   return (
@@ -115,12 +137,44 @@ export function Profile() {
         </button>
       </form>
 
-      <div className="acctlbl">Change Password</div>
+      <div className="acctlbl">Google Account</div>
+      <div className="card">
+        {user.googleEmail ? (
+          <>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Connected: <strong className="num">{user.googleEmail}</strong>
+            </p>
+            <p className="muted">You can log in with this Google account or your password.</p>
+          </>
+        ) : (
+          <p className="muted" style={{ marginTop: 0 }}>
+            Not connected. Link Google as a backup way to access this account.
+          </p>
+        )}
+        {googleMsg && (
+          <p className={googleMsg.kind === 'ok' ? 'form-ok' : 'form-error'} role={googleMsg.kind === 'ok' ? 'status' : 'alert'}>
+            {googleMsg.text}
+          </p>
+        )}
+        {user.googleEmail ? (
+          <button className="btn btn--dark mt8" type="button" disabled={googleBusy} onClick={onDisconnectGoogle}>
+            {googleBusy ? 'Working…' : 'Disconnect Google'}
+          </button>
+        ) : (
+          <a className="btn btn--dark mt8" style={{ textDecoration: 'none' }} href="/api/auth/google?intent=link">
+            Connect Google
+          </a>
+        )}
+      </div>
+
+      <div className="acctlbl">{user.hasPassword ? 'Change Password' : 'Set a Password'}</div>
       <form className="card" onSubmit={savePassword} noValidate>
-        <div className="field">
-          <label htmlFor="p-cur">Current password</label>
-          <input id="p-cur" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />
-        </div>
+        {user.hasPassword && (
+          <div className="field">
+            <label htmlFor="p-cur">Current password</label>
+            <input id="p-cur" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />
+          </div>
+        )}
         <div className="field">
           <label htmlFor="p-new">New password</label>
           <input id="p-new" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" />

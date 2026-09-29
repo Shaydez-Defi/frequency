@@ -3,6 +3,8 @@ export interface PublicUser {
   fullName: string;
   department: string;
   regNumber: string;
+  googleEmail: string | null;
+  hasPassword: boolean;
 }
 
 export interface SemesterRecord {
@@ -71,5 +73,10 @@ export const api = {
   updateProfile: (body: { fullName?: string; department?: string }) =>
     request<{ user: PublicUser }>('/api/auth/profile', { method: 'PATCH', body: JSON.stringify(body) }),
   changePassword: (body: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
-    request<{ ok: true }>('/api/auth/password', { method: 'POST', body: JSON.stringify(body) })
+    request<{ ok: true }>('/api/auth/password', { method: 'POST', body: JSON.stringify(body) }),
+  setupPassword: (body: { newPassword: string; confirmPassword: string }) =>
+    request<{ ok: true }>('/api/auth/password/setup', { method: 'POST', body: JSON.stringify(body) }),
+  googleComplete: (body: { fullName: string; department: string; regNumber: string }) =>
+    request<{ user: PublicUser }>('/api/auth/google/complete', { method: 'POST', body: JSON.stringify(body) }),
+  googleDisconnect: () => request<{ ok: true; user: PublicUser }>('/api/auth/google/disconnect', { method: 'POST' })
 };

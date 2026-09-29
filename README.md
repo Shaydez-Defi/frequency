@@ -19,7 +19,7 @@ TypeScript + React throughout.
 
 ## Data models
 
-- `users(id, full_name, department, reg_number UNIQUE, password_hash, created_at)`
+- `users(id, full_name, department, reg_number UNIQUE, password_hash, google_id UNIQUE NULL, google_email NULL, has_password, created_at)`
 - `semesters(id, user_id FK, level, term, total_units, total_points, gp, UNIQUE(user_id, level, term))`
 - `courses(id, semester_id FK, code, title?, units, grade, quality_points)`
 
@@ -39,6 +39,19 @@ No seed or demo records: every number on screen comes from the API.
   `/semesters/:id/edit` and the GP wizard `/semesters/new` (setup) → `courses`
   → `review` → `result`, guarded by auth + draft state.
 - Backend: see `docs/api-contract.md`.
+
+## Google Sign-In (additional method, password login unchanged)
+
+- Login shows `Continue with Google` alongside reg-number + password. Backend handles
+  the OAuth code flow, verifies the ID token server-side, and never trusts client IDs.
+- First-time Google users land on `/complete-profile` to add name, department, and
+  reg-number once. The Google subject (`sub`) is the link key, never the email.
+- Existing students link from Profile via `Connect Google`. Disconnect is blocked
+  until a password is set, so the account is never locked out.
+- Google-only accounts show `Set a Password` in Profile instead of `Change Password`.
+- Setup: set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (see
+  `.env.example`). Without them, `/api/auth/google` redirects back to login with
+  `?error=google_not_configured` and password login keeps working.
 
 ## Validation (Zod, server is authoritative)
 

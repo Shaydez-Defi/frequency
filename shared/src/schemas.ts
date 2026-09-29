@@ -77,5 +77,29 @@ export const changePasswordSchema = z
     path: ['confirmPassword']
   });
 
+// First-time Google sign-in: academic identity only. The Google subject,
+// email, and name come from the verified pending session, never the client.
+export const completeGoogleProfileSchema = z.object({
+  fullName: z.string().trim().min(2, 'Enter your full name.').max(80),
+  department: z.string().trim().min(2, 'Enter your department.').max(80),
+  regNumber: z
+    .string()
+    .trim()
+    .min(3, 'Enter your registration number.')
+    .max(32)
+    .transform(normalizeRegNumber)
+});
+
+// Establishing a first password for accounts created via Google sign-in.
+export const setupPasswordSchema = z
+  .object({
+    newPassword: z.string().min(8, 'New password must be at least 8 characters.').max(128),
+    confirmPassword: z.string()
+  })
+  .refine((d) => d.newPassword === d.confirmPassword, {
+    message: 'New passwords do not match.',
+    path: ['confirmPassword']
+  });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

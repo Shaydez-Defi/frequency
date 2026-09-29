@@ -50,6 +50,20 @@ body { margin: 0; }
 
 .linklike { background: none; border: none; color: var(--teal); font-weight: 500; cursor: pointer; padding: 0; font-size: 15px; }
 
+/* Google sign-in button (official white-button treatment) */
+.gbtn {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  width: 100%; padding: 13px 22px; border-radius: 8px;
+  background: #fff; border: 1px solid #dadce0; color: #3c4043;
+  font-size: 16px; font-weight: 500; text-decoration: none; cursor: pointer;
+  transition: transform 0.12s ease-out;
+}
+.gbtn:active { transform: scale(0.98); }
+.gbtn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.ordivider { display: flex; align-items: center; gap: 12px; margin: 20px 0; color: var(--ink-2); font-size: 13px; }
+.ordivider::before, .ordivider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
 /* cards & fields */
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 18px; }
 .mt8.card, .card.mt8 { margin-top: 8px; }
@@ -342,12 +356,12 @@ body { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .scr, .dlg, .select__panel { animation: none; }
-  .btn, .backbtn, .avatar, .plusbtn, .calc-card, .semrow,
+  .btn, .gbtn, .backbtn, .avatar, .plusbtn, .calc-card, .semrow,
   .stepper button, .mini-step button, .dots i, .gpill, .cgpacard__cls,
   .select__chev {
     transition: none;
   }
-  .btn:active, .calc-card:active, .backbtn:active, .avatar:active,
+  .btn:active, .gbtn:active, .calc-card:active, .backbtn:active, .avatar:active,
   .plusbtn:active, .stepper button:active, .mini-step button:active {
     transform: none;
   }

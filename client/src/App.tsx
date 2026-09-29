@@ -3,6 +3,7 @@ import { useAuth } from './auth/AuthContext.js';
 import { DraftProvider, useDraft } from './semesters/draft.js';
 import { Landing } from './screens/Landing.js';
 import { Login, Register } from './screens/Auth.js';
+import { CompleteProfile } from './screens/CompleteProfile.js';
 import { Dashboard } from './screens/Dashboard.js';
 import { EditSemester } from './screens/EditSemester.js';
 import { Profile } from './screens/Profile.js';
@@ -39,6 +40,7 @@ export function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/complete-profile" element={<CompleteProfile />} />
         <Route
           path="/dashboard"
           element={
