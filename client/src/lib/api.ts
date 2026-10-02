@@ -6,10 +6,13 @@ export interface PublicUser {
   googleEmail: string | null;
 }
 
+export type EntryMode = 'grade_only' | 'scores';
+
 export interface SemesterRecord {
   id: string;
   level: string;
   term: string;
+  entryMode: EntryMode;
   totalUnits: number;
   totalPoints: number;
   gp: number;
@@ -71,10 +74,10 @@ export const api = {
   logout: () => request<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
   semesters: () =>
     request<{ semesters: SemesterRecord[]; cgpa: number | null; totalUnits: number; totalPoints: number }>('/api/semesters'),
-  createSemester: (body: { level: string; term: string; courses: CoursePayload[] }) =>
+  createSemester: (body: { level: string; term: string; entryMode: EntryMode; courses: CoursePayload[] }) =>
     request<{ id: string; gp: number; totalUnits: number }>('/api/semesters', { method: 'POST', body: JSON.stringify(body) }),
   semester: (id: string) => request<{ semester: SemesterRecord }>(`/api/semesters/${id}`),
-  updateSemester: (id: string, body: { level: string; term: string; courses: CoursePayload[] }) =>
+  updateSemester: (id: string, body: { level: string; term: string; entryMode?: EntryMode; courses: CoursePayload[] }) =>
     request<{ id: string; gp: number; totalUnits: number }>(`/api/semesters/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteSemester: (id: string) => request<{ ok: true }>(`/api/semesters/${id}`, { method: 'DELETE' }),
   updateProfile: (body: { fullName?: string; department?: string }) =>

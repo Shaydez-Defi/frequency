@@ -90,7 +90,7 @@ export function Dashboard() {
                   {s.level} · {s.semester.replace(' Semester', '')}
                 </span>
                 <span className="semrow__s num">
-                  {s.totalUnits} credit units · {s.courses.length} courses
+                  {s.totalUnits} credit units · {s.courses.length} courses · {s.entryMode === 'scores' ? 'Scores' : 'Grades'}
                 </span>
               </span>
               <span className="semrow__gpa num">{fmt(s.gp)}</span>

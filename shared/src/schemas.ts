@@ -39,9 +39,17 @@ export const courseSchema = z
     message: 'Enter both CA and exam scores, or leave both blank.'
   });
 
+export const entryModeSchema = z.enum(['grade_only', 'scores'], {
+  invalid_type_error: 'Choose how to enter results.',
+  required_error: 'Choose how to enter results.'
+});
+
+export type EntryMode = z.infer<typeof entryModeSchema>;
+
 export const createSemesterSchema = z.object({
   level: z.string().trim().min(1, 'Level is required.').max(20),
   term: z.string().trim().min(1, 'Semester is required.').max(20),
+  entryMode: entryModeSchema.optional(),
   courses: z.array(courseSchema).min(1, 'Add at least one course.').max(30)
 });
 

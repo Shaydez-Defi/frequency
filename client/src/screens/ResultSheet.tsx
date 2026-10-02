@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError, api } from '../lib/api.js';
 import type { PublicUser } from '../lib/api.js';
 import { toSavedSemester } from '../lib/semesters.js';
+import { modeLabel } from '../lib/semesters.js';
 import type { SavedSemester } from '../lib/semesters.js';
 import { fmt } from '../lib/gpa.js';
 import { BackBar, EmptyState } from '../components/ui.js';
@@ -46,6 +47,7 @@ export function ResultSheet() {
               <div><dt>Department</dt><dd>{student.department}</dd></div>
               <div><dt>Level</dt><dd>{semester.level}</dd></div>
               <div><dt>Semester</dt><dd>{semester.semester}</dd></div>
+              <div><dt>Entry Mode</dt><dd>{modeLabel(semester.entryMode)}</dd></div>
             </dl>
             <table className="sheet__table">
               <thead>

@@ -2,27 +2,41 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../lib/api.js';
 import type { CoursePayload } from '../lib/api.js';
-import { totals } from '../lib/gpa.js';
+import { courseTotal, totals } from '../lib/gpa.js';
 import type { Grade } from '../types.js';
 import { useDraft } from '../semesters/draft.js';
+import { modeLabel } from '../lib/semesters.js';
 import { CourseRow, Stat } from '../components/ui.js';
 import { fmt } from '../lib/gpa.js';
+import { derivedGrade } from './CourseEntry.js';
 
 export function Review() {
-  const { level, term, courses, reset } = useDraft();
+  const { level, term, entryMode, courses, reset } = useDraft();
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const scoresMode = entryMode === 'scores';
 
   const parsed: CoursePayload[] = useMemo(
     () =>
-      courses.map((c) => ({
-        code: c.code.trim(),
-        title: c.title.trim(),
-        units: Number(c.units),
-        grade: c.grade.trim().toUpperCase()
-      })),
-    [courses]
+      courses.map((c) => {
+        const body: CoursePayload = {
+          code: c.code.trim(),
+          title: c.title.trim(),
+          units: Number(c.units),
+          grade: (scoresMode ? derivedGrade(c) : c.grade.trim().toUpperCase()) ?? c.grade.trim().toUpperCase()
+        };
+        if (scoresMode) {
+          const ca = c.ca.trim() === '' ? undefined : Number(c.ca);
+          const exam = c.exam.trim() === '' ? undefined : Number(c.exam);
+          if (ca !== undefined && exam !== undefined) {
+            body.ca_score = ca;
+            body.exam_score = exam;
+          }
+        }
+        return body;
+      }),
+    [courses, scoresMode]
   );
 
   const t = useMemo(() => {
@@ -36,14 +50,14 @@ export function Review() {
   }, [parsed]);
 
   async function save() {
-    if (!t) {
+    if (!t || !entryMode) {
       setError('These courses cannot be calculated. Go back and check each row.');
       return;
     }
     setError('');
     setBusy(true);
     try {
-      await api.createSemester({ level, term, courses: parsed });
+      await api.createSemester({ level, term, entryMode, courses: parsed });
       reset();
       navigate('/semesters/new/result', {
         state: { level: `${level} Level`, term, gp: t.gpa, units: t.units }
@@ -64,7 +78,7 @@ export function Review() {
         <div>
           <div className="screentitle">Review your GPA</div>
           <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-            {level} Level · {term}
+            {level} Level · {term} · {entryMode ? modeLabel(entryMode) : ''}
           </div>
         </div>
       </div>
@@ -80,9 +94,14 @@ export function Review() {
         Courses
       </div>
       <div className="card">
-        {parsed.map((c, i) => (
-          <CourseRow key={`${c.code}-${i}`} code={c.code} title={c.title ?? ''} meta={`${c.units} units`} grade={c.grade as Grade} />
-        ))}
+        {parsed.map((c, i) => {
+          const total = c.ca_score !== undefined && c.exam_score !== undefined ? courseTotal(c.ca_score, c.exam_score) : null;
+          const meta =
+            total === null
+              ? `${c.units} units`
+              : `${c.units} units · CA ${c.ca_score} · Exam ${c.exam_score} · Total ${total}`;
+          return <CourseRow key={`${c.code}-${i}`} code={c.code} title={c.title ?? ''} meta={meta} grade={c.grade as Grade} />;
+        })}
       </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}

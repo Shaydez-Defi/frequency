@@ -1,11 +1,14 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import type { EntryMode } from '../lib/api.js';
 
 export interface CourseDraft {
   code: string;
   title: string;
   units: string;
   grade: string;
+  ca: string;
+  exam: string;
 }
 
 interface DraftState {
@@ -13,8 +16,9 @@ interface DraftState {
   level: string;
   term: string;
   count: number;
+  entryMode: EntryMode | '';
   courses: CourseDraft[];
-  setSetup: (level: string, term: string, count: number) => void;
+  setSetup: (level: string, term: string, count: number, entryMode: EntryMode) => void;
   setCourses: (courses: CourseDraft[]) => void;
   updateCourse: (index: number, patch: Partial<CourseDraft>) => void;
   adjustUnits: (index: number, delta: number) => void;
@@ -23,20 +27,22 @@ interface DraftState {
 
 const DraftContext = createContext<DraftState | null>(null);
 
-const blankRow = (): CourseDraft => ({ code: '', title: '', units: '', grade: '' });
+const blankRow = (): CourseDraft => ({ code: '', title: '', units: '', grade: '', ca: '', exam: '' });
 
 export function DraftProvider({ children }: { children: ReactNode }) {
   const [level, setLevel] = useState('');
   const [term, setTerm] = useState('');
   const [count, setCount] = useState(0);
+  const [entryMode, setEntryMode] = useState<EntryMode | ''>('');
   const [courses, setCoursesState] = useState<CourseDraft[]>([]);
   const [started, setStarted] = useState(false);
 
   const setSetup = useCallback(
-    (nextLevel: string, nextTerm: string, nextCount: number) => {
+    (nextLevel: string, nextTerm: string, nextCount: number, nextMode: EntryMode) => {
       setLevel(nextLevel);
       setTerm(nextTerm);
       setCount(nextCount);
+      setEntryMode(nextMode);
       setStarted(true);
       // Resize rows but keep anything the student already typed.
       setCoursesState((prev) => {
@@ -66,13 +72,14 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     setLevel('');
     setTerm('');
     setCount(0);
+    setEntryMode('');
     setCoursesState([]);
     setStarted(false);
   }, []);
 
   const value = useMemo(
-    () => ({ started, level, term, count, courses, setSetup, setCourses, updateCourse, adjustUnits, reset }),
-    [started, level, term, count, courses, setSetup, setCourses, updateCourse, adjustUnits, reset]
+    () => ({ started, level, term, count, entryMode, courses, setSetup, setCourses, updateCourse, adjustUnits, reset }),
+    [started, level, term, count, entryMode, courses, setSetup, setCourses, updateCourse, adjustUnits, reset]
   );
   return <DraftContext.Provider value={value}>{children}</DraftContext.Provider>;
 }

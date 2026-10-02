@@ -66,11 +66,11 @@ No seed or demo records: every number on screen comes from the API.
 
 ## V1 flow
 
-Landing -> Continue with Google -> (new: Complete Profile) -> Dashboard -> Calculate your GPA -> setup (count, level, semester)
--> course entry (running units, sticky review bar) -> review (Edit / Save GPA)
--> result (semester GPA + live CGPA) -> Dashboard. Semester rows open details with
-per-course points, Edit (add/remove supported, server recalculates) and Delete
-(confirmed, cascades, CGPA recalculated). Profile edits name/department and logs out.
+Landing -> Continue with Google -> (new: Complete Profile) -> Dashboard -> Calculate your GPA -> setup (count, level, semester, entry mode: Grade Only or Scores + Grade)
+-> course entry (grades, or CA/Exam with derived totals) -> review -> result (semester GPA + live CGPA) -> Dashboard. Semester rows open details with
+per-course points, Edit (mode-aware, server recalculates) and Delete
+(confirmed, cascades, CGPA recalculated). Grade Only semesters offer Add Scores to convert to Scores + Grade.
+Profile edits name/department and logs out.
 Courses optionally carry CA (0-30) and Exam (0-70) scores: grade-only records keep
 working, adding both later derives total, grade, and points server-side.
 Semester Details has a Print Result Sheet action rendering a clean A4 document

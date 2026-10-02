@@ -1,4 +1,4 @@
-import type { SemesterRecord } from './api.js';
+import type { EntryMode, SemesterRecord } from './api.js';
 import type { Course, Grade } from '../types.js';
 
 const VALID_GRADES: Grade[] = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -19,6 +19,7 @@ export interface SavedSemester {
   id: string;
   level: string;
   semester: string;
+  entryMode: EntryMode;
   courses: SavedCourse[];
   totalUnits: number;
   totalPoints: number;
@@ -26,11 +27,16 @@ export interface SavedSemester {
   createdAt: string;
 }
 
+export function modeLabel(mode: EntryMode): string {
+  return mode === 'scores' ? 'Scores + Grade' : 'Grade Only';
+}
+
 export function toSavedSemester(r: SemesterRecord): SavedSemester {
   return {
     id: r.id,
     level: displayLevel(r.level),
     semester: r.term,
+    entryMode: r.entryMode === 'scores' ? 'scores' : 'grade_only',
     courses: r.courses.map((c) => ({
       code: c.code,
       title: c.title ?? '',

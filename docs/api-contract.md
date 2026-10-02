@@ -18,10 +18,14 @@ accounts keep their rows and semesters; their owner links them deliberately via
 
 ## Semesters
 - `GET /semesters` -> 200 { semesters: [...with courses], cgpa, totalUnits, totalPoints }
-- `POST /semesters` { level, term, courses: [{ code, title?, units, grade, ca_score?, exam_score? }] } -> 201 { id, gp, totalUnits }
+- `POST /semesters` { level, term, entryMode: 'grade_only' | 'scores', courses: [{ code, title?, units, grade, ca_score?, exam_score? }] } -> 201 { id, gp, totalUnits }
 - `GET /semesters/:id` -> 200 { semester } | 401 | 404 (ownership-checked)
-- `PUT /semesters/:id` { level, term, courses } -> 200 { id, gp, totalUnits } | 400 | 401 | 404 | 409
+- `PUT /semesters/:id` { level, term, entryMode?, courses } -> 200 { id, gp, totalUnits } | 400 | 401 | 404 | 409
 - `DELETE /semesters/:id` -> 200 | 401 | 404 (courses cascade)
+
+Entry modes: chosen once at setup and stored per semester (`entryMode`, old rows read as `grade_only`).
+`grade_only` drops stray scores; `scores` requires complete scores on every course.
+Upgrading `grade_only` -> `scores` (Add Scores) recalculates and persists; downgrading is refused with 400.
 
 Course readings include `ca_score`, `exam_score` (null when never entered), and
 derived `total_score`. When both scores are present the server derives total,

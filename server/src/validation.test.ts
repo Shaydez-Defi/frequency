@@ -42,6 +42,14 @@ describe('createSemesterSchema', () => {
     const r = createSemesterSchema.safeParse({ level: '100', term: 'First Semester', courses: [] });
     expect(r.success).toBe(false);
   });
+
+  test('accepts an optional entry mode and rejects unknown modes', () => {
+    const base = { level: '100', term: 'First Semester', courses: [{ code: 'CSC 101', units: 3, grade: 'A' }] };
+    expect(createSemesterSchema.safeParse(base).success).toBe(true);
+    expect(createSemesterSchema.safeParse({ ...base, entryMode: 'grade_only' }).success).toBe(true);
+    expect(createSemesterSchema.safeParse({ ...base, entryMode: 'scores' }).success).toBe(true);
+    expect(createSemesterSchema.safeParse({ ...base, entryMode: 'mixed' }).success).toBe(false);
+  });
 });
 
 describe('courseCountSchema', () => {

@@ -12,6 +12,7 @@ import { CourseEntry } from './screens/CourseEntry.js';
 import { Review } from './screens/Review.js';
 import { Result } from './screens/Result.js';
 import { SemesterDetails } from './screens/SemesterDetails.js';
+import { AddScores } from './screens/AddScores.js';
 import { ResultSheet } from './screens/ResultSheet.js';
 import type { JSX } from 'react';
 
@@ -74,6 +75,16 @@ export function App() {
             <RequireAuth>
               <RequireSemesterId>
                 <ResultSheet />
+              </RequireSemesterId>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/semesters/:id/add-scores"
+          element={
+            <RequireAuth>
+              <RequireSemesterId>
+                <AddScores />
               </RequireSemesterId>
             </RequireAuth>
           }

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS semesters (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   level TEXT NOT NULL,
   term TEXT NOT NULL,
+  entry_mode TEXT NOT NULL DEFAULT 'grade_only',
   total_units INTEGER NOT NULL,
   total_points REAL NOT NULL,
   gp REAL NOT NULL,

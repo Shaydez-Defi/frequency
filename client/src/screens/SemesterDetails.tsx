@@ -5,6 +5,7 @@ import { toSavedSemester } from '../lib/semesters.js';
 import type { SavedSemester } from '../lib/semesters.js';
 import { fmt } from '../lib/gpa.js';
 import { BackBar, CourseRow, EmptyState, Stat } from '../components/ui.js';
+import { modeLabel } from '../lib/semesters.js';
 import type { SavedCourse } from '../lib/semesters.js';
 
 const dash = (v: number | null): string => (v === null || v === undefined ? '—' : String(v));
@@ -55,6 +56,7 @@ export function SemesterDetails() {
     <section className="scr">
       <BackBar
         title={semester ? `${semester.level} · ${semester.semester}` : 'Semester'}
+        subtitle={semester ? modeLabel(semester.entryMode) : undefined}
         onBack={() => navigate('/dashboard')}
       />
       {loading ? (
@@ -95,6 +97,11 @@ export function SemesterDetails() {
           <button className="btn btn--dark mt16" onClick={() => navigate(`/semesters/${semester.id}/result`)}>
             Print Result Sheet
           </button>
+          {semester.entryMode === 'grade_only' && (
+            <button className="btn btn--ghost mt8" onClick={() => navigate(`/semesters/${semester.id}/add-scores`)}>
+              Add Scores
+            </button>
+          )}
         </>
       )}
 

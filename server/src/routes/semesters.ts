@@ -13,6 +13,7 @@ interface SemesterRow {
   user_id: string;
   level: string;
   term: string;
+  entry_mode: string | null;
   total_units: number;
   total_points: number;
   gp: number;
@@ -38,6 +39,12 @@ function userId(req: unknown): string {
   return (req as { user: { id: string } }).user.id;
 }
 
+export type SemesterEntryMode = 'grade_only' | 'scores';
+
+export function toEntryMode(value: unknown): SemesterEntryMode {
+  return value === 'scores' ? 'scores' : 'grade_only';
+}
+
 async function withCourses(s: SemesterRow, tx?: Db) {
   const get = tx ? tx.all<CourseRow> : queryAll<CourseRow>;
   const courses = await get('SELECT * FROM courses WHERE semester_id = ?', s.id);
@@ -45,6 +52,7 @@ async function withCourses(s: SemesterRow, tx?: Db) {
     id: s.id,
     level: s.level,
     term: s.term,
+    entryMode: toEntryMode(s.entry_mode),
     totalUnits: s.total_units,
     totalPoints: s.total_points,
     gp: s.gp,
@@ -63,6 +71,18 @@ interface ResolvedInput {
   grade: string;
   ca_score?: number;
   exam_score?: number;
+}
+
+// Mode shaping, applied before derivation:
+// - grade_only semesters never store scores (stray values are dropped).
+// - scores semesters require complete scores on every course.
+function shapeForMode(courses: ResolvedInput[], mode: SemesterEntryMode): ResolvedInput[] | string {
+  if (mode === 'grade_only') {
+    return courses.map((c) => ({ ...c, ca_score: undefined, exam_score: undefined }));
+  }
+  const missing = courses.find((c) => c.ca_score === undefined || c.exam_score === undefined);
+  if (missing) return `Enter CA and exam scores for every course, including ${missing.code || 'one course'}.`;
+  return courses;
 }
 
 // Grades, points, and totals are derived here. Client-supplied grade/points
@@ -137,10 +157,16 @@ semestersRouter.post(
     }
     const id = userId(req);
     const { level, term, courses } = parsed.data;
+    const entryMode = toEntryMode(parsed.data.entryMode ?? 'grade_only');
+    const shaped = shapeForMode(courses, entryMode);
+    if (typeof shaped === 'string') {
+      res.status(400).json({ error: shaped });
+      return;
+    }
     let totals;
     let resolved;
     try {
-      resolved = resolveInputs(courses);
+      resolved = resolveInputs(shaped);
       totals = calcSemester(resolved);
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid calculation.' });
@@ -163,16 +189,17 @@ semestersRouter.post(
     const semesterId = randomUUID();
     await withTransaction(async (tx) => {
       await tx.run(
-        'INSERT INTO semesters (id, user_id, level, term, total_units, total_points, gp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO semesters (id, user_id, level, term, entry_mode, total_units, total_points, gp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         semesterId,
         id,
         level.trim(),
         term.trim(),
+        entryMode,
         totals.totalUnits,
         totals.totalPoints,
         totals.gp as number
       );
-      await insertCourses(tx, semesterId, courses);
+      await insertCourses(tx, semesterId, shaped);
     });
     res.status(201).json({ id: semesterId, gp: totals.gp, totalUnits: totals.totalUnits });
   })
@@ -209,9 +236,21 @@ semestersRouter.put(
       return;
     }
     const { level, term, courses } = parsed.data;
+    const currentMode = toEntryMode(existing.entry_mode);
+    const requestedMode = toEntryMode(parsed.data.entryMode ?? currentMode);
+    // No downgrade in V1: scores stay with the semester once stored.
+    if (currentMode === 'scores' && requestedMode === 'grade_only') {
+      res.status(400).json({ error: 'This semester already uses scores. Scores cannot be removed once saved.' });
+      return;
+    }
+    const shaped = shapeForMode(courses, requestedMode);
+    if (typeof shaped === 'string') {
+      res.status(400).json({ error: shaped });
+      return;
+    }
     let totals;
     try {
-      totals = calcSemester(resolveInputs(courses));
+      totals = calcSemester(resolveInputs(shaped));
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid calculation.' });
       return;
@@ -234,16 +273,17 @@ semestersRouter.put(
     // Client-supplied GP/totals are ignored: everything below is derived server-side.
     await withTransaction(async (tx) => {
       await tx.run(
-        'UPDATE semesters SET level = ?, term = ?, total_units = ?, total_points = ?, gp = ? WHERE id = ?',
+        'UPDATE semesters SET level = ?, term = ?, entry_mode = ?, total_units = ?, total_points = ?, gp = ? WHERE id = ?',
         level.trim(),
         term.trim(),
+        requestedMode,
         totals.totalUnits,
         totals.totalPoints,
         totals.gp as number,
         existing.id
       );
       await tx.run('DELETE FROM courses WHERE semester_id = ?', existing.id);
-      await insertCourses(tx, existing.id, courses);
+      await insertCourses(tx, existing.id, shaped);
     });
     res.json({ id: existing.id, gp: totals.gp, totalUnits: totals.totalUnits });
   })

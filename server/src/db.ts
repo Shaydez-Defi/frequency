@@ -72,6 +72,11 @@ async function sqliteConn(): Promise<SqliteDb> {
     if (!courseNames.has('exam_score')) {
       db.exec(`ALTER TABLE courses ADD COLUMN exam_score REAL`);
     }
+    const semCols = db.prepare('PRAGMA table_info(semesters)').all() as Array<{ name: string }>;
+    // Semester entry mode: pre-existing rows default to grade_only.
+    if (!new Set(semCols.map((c) => c.name)).has('entry_mode')) {
+      db.exec(`ALTER TABLE semesters ADD COLUMN entry_mode TEXT NOT NULL DEFAULT 'grade_only'`);
+    }
     sqlite = db;
   }
   return sqlite;
@@ -129,6 +134,7 @@ async function ensurePg(): Promise<void> {
       await pgPool().query(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id)`);
       await pgPool().query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS ca_score DOUBLE PRECISION`);
       await pgPool().query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS exam_score DOUBLE PRECISION`);
+      await pgPool().query(`ALTER TABLE semesters ADD COLUMN IF NOT EXISTS entry_mode TEXT NOT NULL DEFAULT 'grade_only'`);
     })();
   }
   return pgReady;
