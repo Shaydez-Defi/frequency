@@ -23,7 +23,7 @@ export function createApp() {
 
   // Never leak raw errors: malformed JSON -> 400, anything else -> generic 500.
   const errors: ErrorRequestHandler = (err, _req, res, _next) => {
-    if (err?.type === 'entity.parse.failed' || err?.status === 400) {
+    if (err?.type === 'entity.parse.failed' || err?.status === 400 || err?.statusCode === 400) {
       res.status(400).json({ error: 'Invalid request body.' });
       return;
     }
