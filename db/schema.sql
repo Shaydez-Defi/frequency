@@ -16,7 +16,9 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id);
+-- NOTE: users_google_id_unique is created by the server migration in
+-- server/src/db.ts AFTER ensuring the google columns exist, so upgrades
+-- of databases created before Google linking never fail here.
 
 CREATE TABLE IF NOT EXISTS semesters (
   id TEXT PRIMARY KEY,
