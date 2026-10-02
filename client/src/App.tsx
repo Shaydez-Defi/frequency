@@ -12,6 +12,7 @@ import { CourseEntry } from './screens/CourseEntry.js';
 import { Review } from './screens/Review.js';
 import { Result } from './screens/Result.js';
 import { SemesterDetails } from './screens/SemesterDetails.js';
+import { ResultSheet } from './screens/ResultSheet.js';
 import type { JSX } from 'react';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -63,6 +64,16 @@ export function App() {
             <RequireAuth>
               <RequireSemesterId>
                 <SemesterDetails />
+              </RequireSemesterId>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/semesters/:id/result"
+          element={
+            <RequireAuth>
+              <RequireSemesterId>
+                <ResultSheet />
               </RequireSemesterId>
             </RequireAuth>
           }

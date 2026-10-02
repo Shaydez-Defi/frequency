@@ -345,6 +345,34 @@ body { margin: 0; }
   .dlg-backdrop { align-items: center; }
 }
 
+/* result sheet: plain document, print-optimized */
+.sheet { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 24px 22px; }
+.sheet__title { text-align: center; font-size: 22px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 20px; color: var(--ink); }
+.sheet__who { display: grid; gap: 8px; margin: 0 0 20px; }
+.sheet__who > div { display: flex; gap: 12px; font-size: 14.5px; }
+.sheet__who dt { min-width: 168px; color: var(--ink-2); }
+.sheet__who dd { margin: 0; font-weight: 500; }
+.sheet__table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.sheet__table th, .sheet__table td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+.sheet__table thead th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border-bottom: 2px solid var(--ink); }
+.sheet__sums { display: grid; gap: 8px; margin: 20px 0 0; }
+.sheet__sums > div { display: flex; gap: 12px; font-size: 14.5px; }
+.sheet__sums dt { min-width: 168px; color: var(--ink-2); }
+.sheet__sums dd { margin: 0; font-weight: 600; }
+.sheet__note { margin: 22px 0 0; font-size: 12px; color: var(--ink-2); text-align: center; }
+
+@page { size: A4; margin: 12mm; }
+
+@media print {
+  body { background: #fff; }
+  .app { max-width: none; box-shadow: none; }
+  .scr { padding: 0; animation: none; }
+  .noprint { display: none !important; }
+  .sheet { border: none; border-radius: 0; padding: 0; }
+  .sheet__table thead { display: table-header-group; }
+  .sheet__table tr { break-inside: avoid; }
+}
+
 /* long titles, departments and codes wrap instead of overflowing */
 .rrow__code, .rrow__meta, .profname, .profdept, .dashhead__sub,
 .screentitle, .semrow__t {

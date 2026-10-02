@@ -10,6 +10,9 @@ export function displayLevel(level: string): string {
 
 export interface SavedCourse extends Course {
   qualityPoints: number;
+  caScore: number | null;
+  examScore: number | null;
+  totalScore: number | null;
 }
 
 export interface SavedSemester {
@@ -33,7 +36,10 @@ export function toSavedSemester(r: SemesterRecord): SavedSemester {
       title: c.title ?? '',
       units: c.units,
       grade: (VALID_GRADES.includes(c.grade as Grade) ? c.grade : 'F') as Grade,
-      qualityPoints: c.quality_points
+      qualityPoints: c.quality_points,
+      caScore: c.ca_score,
+      examScore: c.exam_score,
+      totalScore: c.total_score
     })),
     totalUnits: r.totalUnits,
     totalPoints: r.totalPoints,

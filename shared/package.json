@@ -13,6 +13,7 @@
     "./gradeScale": "./dist/gradeScale.js",
     "./calc": "./dist/calc.js",
     "./schemas": "./dist/schemas.js",
+    "./scores": "./dist/scores.js",
     "./classification": "./dist/classification.js"
   }
 }

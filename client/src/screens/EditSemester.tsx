@@ -4,6 +4,7 @@ import { ApiError, api } from '../lib/api.js';
 import type { CoursePayload } from '../lib/api.js';
 import { GRADES } from '../types.js';
 import { courseSchema } from '@frequency/shared/schemas';
+import { CA_MAX, EXAM_MAX, courseTotal, gradeForTotal } from '../lib/gpa.js';
 import { Select } from '../components/Select.js';
 import { BackBar, EmptyState } from '../components/ui.js';
 
@@ -12,13 +13,21 @@ interface Row {
   title: string;
   units: string;
   grade: string;
+  ca: string;
+  exam: string;
 }
 
-const blankRow = (): Row => ({ code: '', title: '', units: '2', grade: '' });
+const blankRow = (): Row => ({ code: '', title: '', units: '2', grade: '', ca: '', exam: '' });
 
 function validUnits(raw: string): number {
   const u = Number(raw);
   return Number.isInteger(u) && u >= 1 && u <= 12 ? u : Number.NaN;
+}
+
+function scoreOrUndefined(raw: string): number | undefined {
+  const t = raw.trim();
+  if (t === '') return undefined;
+  return Number(t);
 }
 
 export function EditSemester() {
@@ -44,7 +53,9 @@ export function EditSemester() {
             code: c.code,
             title: c.title ?? '',
             units: String(c.units),
-            grade: c.grade
+            grade: c.grade,
+            ca: c.ca_score === null || c.ca_score === undefined ? '' : String(c.ca_score),
+            exam: c.exam_score === null || c.exam_score === undefined ? '' : String(c.exam_score)
           }))
         );
       })
@@ -59,7 +70,9 @@ export function EditSemester() {
           code: row.code,
           title: row.title,
           units: row.units.trim() === '' ? Number.NaN : Number(row.units),
-          grade: row.grade
+          grade: row.grade,
+          ca_score: scoreOrUndefined(row.ca),
+          exam_score: scoreOrUndefined(row.exam)
         });
         return r.success ? [] : r.error.issues.map((i) => i.message);
       }),
@@ -96,12 +109,21 @@ export function EditSemester() {
     setError('');
     setBusy(true);
     try {
-      const payload: CoursePayload[] = rows.map((c) => ({
-        code: c.code.trim(),
-        title: c.title.trim(),
-        units: Number(c.units),
-        grade: c.grade.trim().toUpperCase()
-      }));
+      const payload: CoursePayload[] = rows.map((c) => {
+        const body: CoursePayload = {
+          code: c.code.trim(),
+          title: c.title.trim(),
+          units: Number(c.units),
+          grade: c.grade.trim().toUpperCase()
+        };
+        const ca = scoreOrUndefined(c.ca);
+        const exam = scoreOrUndefined(c.exam);
+        if (ca !== undefined && exam !== undefined) {
+          body.ca_score = ca;
+          body.exam_score = exam;
+        }
+        return body;
+      });
       await api.updateSemester(id ?? '', { level, term, courses: payload });
       navigate(`/semesters/${id}`);
     } catch (e) {
@@ -177,6 +199,48 @@ export function EditSemester() {
                   onChange={(v) => update(i, { grade: v })}
                 />
               </div>
+              <div className="units-row" style={{ marginTop: 10 }}>
+                <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                  <label htmlFor={`ca-${i}`}>CA (/{CA_MAX})</label>
+                  <input
+                    id={`ca-${i}`}
+                    className="ccard__input"
+                    style={{ marginBottom: 0 }}
+                    inputMode="decimal"
+                    placeholder="—"
+                    aria-label={`Course ${i + 1} CA score`}
+                    value={row.ca}
+                    onChange={(e) => update(i, { ca: e.target.value })}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                  <label htmlFor={`ex-${i}`}>Exam (/{EXAM_MAX})</label>
+                  <input
+                    id={`ex-${i}`}
+                    className="ccard__input"
+                    style={{ marginBottom: 0 }}
+                    inputMode="decimal"
+                    placeholder="—"
+                    aria-label={`Course ${i + 1} exam score`}
+                    value={row.exam}
+                    onChange={(e) => update(i, { exam: e.target.value })}
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+              {(() => {
+                const ca = scoreOrUndefined(row.ca);
+                const exam = scoreOrUndefined(row.exam);
+                const total = ca !== undefined && exam !== undefined ? courseTotal(ca, exam) : null;
+                if (total === null) return null;
+                return (
+                  <p className="muted" style={{ margin: '8px 0 0' }}>
+                    Scores entered: total <strong className="num">{total}</strong> → grade{' '}
+                    <strong>{gradeForTotal(total)}</strong> (set on save).
+                  </p>
+                );
+              })()}
               {tried && rowErrors[i].length > 0 && (
                 <ul className="form-error" style={{ paddingLeft: 18, marginBottom: 0 }}>
                   {rowErrors[i].map((m) => (

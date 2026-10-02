@@ -35,5 +35,7 @@ CREATE TABLE IF NOT EXISTS courses (
   title TEXT,
   units INTEGER NOT NULL CHECK (units > 0 AND units <= 12),
   grade TEXT NOT NULL,
-  quality_points DOUBLE PRECISION NOT NULL
+  quality_points DOUBLE PRECISION NOT NULL,
+  ca_score DOUBLE PRECISION,
+  exam_score DOUBLE PRECISION
 );

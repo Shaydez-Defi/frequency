@@ -71,6 +71,10 @@ Landing -> Continue with Google -> (new: Complete Profile) -> Dashboard -> Calcu
 -> result (semester GPA + live CGPA) -> Dashboard. Semester rows open details with
 per-course points, Edit (add/remove supported, server recalculates) and Delete
 (confirmed, cascades, CGPA recalculated). Profile edits name/department and logs out.
+Courses optionally carry CA (0-30) and Exam (0-70) scores: grade-only records keep
+working, adding both later derives total, grade, and points server-side.
+Semester Details has a Print Result Sheet action rendering a clean A4 document
+(student, courses, totals, GPA) via the browser print dialog.
 
 ## Run
 

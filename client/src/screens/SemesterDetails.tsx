@@ -5,6 +5,18 @@ import { toSavedSemester } from '../lib/semesters.js';
 import type { SavedSemester } from '../lib/semesters.js';
 import { fmt } from '../lib/gpa.js';
 import { BackBar, CourseRow, EmptyState, Stat } from '../components/ui.js';
+import type { SavedCourse } from '../lib/semesters.js';
+
+const dash = (v: number | null): string => (v === null || v === undefined ? '—' : String(v));
+
+function scoreMeta(c: SavedCourse): string {
+  const base = `${c.units} ${c.units === 1 ? 'Unit' : 'Units'}`;
+  const points = `${c.qualityPoints} ${c.qualityPoints === 1 ? 'Point' : 'Points'}`;
+  if (c.caScore === null && c.examScore === null) {
+    return `${base} · CA: — · Exam: — · ${c.grade} · ${points}`;
+  }
+  return `${base} · CA: ${dash(c.caScore)} · Exam: ${dash(c.examScore)} · Total: ${dash(c.totalScore)} · ${c.grade} · ${points}`;
+}
 
 export function SemesterDetails() {
   const { id } = useParams();
@@ -66,7 +78,7 @@ export function SemesterDetails() {
                 key={c.code}
                 code={c.code}
                 title={c.title}
-                meta={`${c.units} ${c.units === 1 ? 'Unit' : 'Units'} · ${c.grade} · ${c.qualityPoints} ${c.qualityPoints === 1 ? 'Point' : 'Points'}`}
+                meta={scoreMeta(c)}
                 grade={c.grade}
               />
             ))}
@@ -80,6 +92,9 @@ export function SemesterDetails() {
               Delete
             </button>
           </div>
+          <button className="btn btn--dark mt16" onClick={() => navigate(`/semesters/${semester.id}/result`)}>
+            Print Result Sheet
+          </button>
         </>
       )}
 

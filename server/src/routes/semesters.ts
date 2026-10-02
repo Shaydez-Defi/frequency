@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { calcCgpa, calcSemester } from '@frequency/shared/calc';
-import { GRADE_POINTS } from '@frequency/shared/gradeScale';
+import { courseTotal, resolveCourse } from '@frequency/shared/scores';
 import { createSemesterSchema } from '@frequency/shared/schemas';
 import { queryAll, queryGet, queryRun, withTransaction } from '../db.js';
 import type { Db } from '../db.js';
@@ -27,6 +27,8 @@ interface CourseRow {
   units: number;
   grade: string;
   quality_points: number;
+  ca_score: number | null;
+  exam_score: number | null;
 }
 
 export const semestersRouter = Router();
@@ -38,6 +40,7 @@ function userId(req: unknown): string {
 
 async function withCourses(s: SemesterRow, tx?: Db) {
   const get = tx ? tx.all<CourseRow> : queryAll<CourseRow>;
+  const courses = await get('SELECT * FROM courses WHERE semester_id = ?', s.id);
   return {
     id: s.id,
     level: s.level,
@@ -46,27 +49,58 @@ async function withCourses(s: SemesterRow, tx?: Db) {
     totalPoints: s.total_points,
     gp: s.gp,
     createdAt: s.created_at,
-    courses: await get('SELECT * FROM courses WHERE semester_id = ?', s.id)
+    courses: courses.map((c) => ({
+      ...c,
+      total_score: courseTotal(c.ca_score, c.exam_score)
+    }))
   };
 }
 
-function insertCourses(
-  tx: Db,
-  semesterId: string,
-  courses: Array<{ code: string; title?: string; units: number; grade: string }>
-) {
+interface ResolvedInput {
+  code: string;
+  title?: string;
+  units: number;
+  grade: string;
+  ca_score?: number;
+  exam_score?: number;
+}
+
+// Grades, points, and totals are derived here. Client-supplied grade/points
+// are ignored whenever both scores exist; grade-only rows keep working.
+function resolveInputs(courses: ResolvedInput[]) {
+  return courses.map((c) => {
+    const r = resolveCourse({
+      code: c.code,
+      units: c.units,
+      grade: c.grade,
+      caScore: c.ca_score ?? null,
+      examScore: c.exam_score ?? null
+    });
+    return { ...c, grade: r.grade };
+  });
+}
+
+function insertCourses(tx: Db, semesterId: string, courses: ResolvedInput[]) {
   return Promise.all(
     courses.map((c) => {
-      const grade = c.grade.toUpperCase();
+      const r = resolveCourse({
+        code: c.code,
+        units: c.units,
+        grade: c.grade,
+        caScore: c.ca_score ?? null,
+        examScore: c.exam_score ?? null
+      });
       return tx.run(
-        'INSERT INTO courses (id, semester_id, code, title, units, grade, quality_points) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO courses (id, semester_id, code, title, units, grade, quality_points, ca_score, exam_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         randomUUID(),
         semesterId,
         c.code.trim().toUpperCase(),
         c.title?.trim() || null,
         c.units,
-        grade,
-        c.units * GRADE_POINTS[grade]
+        r.grade,
+        c.units * r.points,
+        c.ca_score ?? null,
+        c.exam_score ?? null
       );
     })
   );
@@ -104,8 +138,10 @@ semestersRouter.post(
     const id = userId(req);
     const { level, term, courses } = parsed.data;
     let totals;
+    let resolved;
     try {
-      totals = calcSemester(courses);
+      resolved = resolveInputs(courses);
+      totals = calcSemester(resolved);
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid calculation.' });
       return;
@@ -175,7 +211,7 @@ semestersRouter.put(
     const { level, term, courses } = parsed.data;
     let totals;
     try {
-      totals = calcSemester(courses);
+      totals = calcSemester(resolveInputs(courses));
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Invalid calculation.' });
       return;

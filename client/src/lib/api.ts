@@ -21,6 +21,9 @@ export interface SemesterRecord {
     units: number;
     grade: string;
     quality_points: number;
+    ca_score: number | null;
+    exam_score: number | null;
+    total_score: number | null;
   }>;
 }
 
@@ -29,6 +32,8 @@ export interface CoursePayload {
   title?: string;
   units: number;
   grade: string;
+  ca_score?: number;
+  exam_score?: number;
 }
 
 export class ApiError extends Error {

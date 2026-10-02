@@ -63,6 +63,15 @@ async function sqliteConn(): Promise<SqliteDb> {
       db.exec(`ALTER TABLE users DROP COLUMN has_password`);
     }
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id)`);
+    const courseCols = db.prepare('PRAGMA table_info(courses)').all() as Array<{ name: string }>;
+    const courseNames = new Set(courseCols.map((c) => c.name));
+    // Optional CA/Exam scores: existing grade-only rows keep working untouched.
+    if (!courseNames.has('ca_score')) {
+      db.exec(`ALTER TABLE courses ADD COLUMN ca_score REAL`);
+    }
+    if (!courseNames.has('exam_score')) {
+      db.exec(`ALTER TABLE courses ADD COLUMN exam_score REAL`);
+    }
     sqlite = db;
   }
   return sqlite;
@@ -118,6 +127,8 @@ async function ensurePg(): Promise<void> {
       await pgPool().query(`ALTER TABLE users DROP COLUMN IF EXISTS password_hash`);
       await pgPool().query(`ALTER TABLE users DROP COLUMN IF EXISTS has_password`);
       await pgPool().query(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id)`);
+      await pgPool().query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS ca_score DOUBLE PRECISION`);
+      await pgPool().query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS exam_score DOUBLE PRECISION`);
     })();
   }
   return pgReady;

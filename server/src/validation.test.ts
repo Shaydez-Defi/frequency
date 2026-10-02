@@ -21,6 +21,20 @@ describe('courseSchema', () => {
     expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'Z' }).success).toBe(false);
     expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: '' }).success).toBe(false);
   });
+
+  test('accepts optional CA and exam scores within range', () => {
+    expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', ca_score: 24, exam_score: 61 }).success).toBe(true);
+    expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', ca_score: '', exam_score: '' }).success).toBe(true);
+    expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', ca_score: null, exam_score: null }).success).toBe(true);
+  });
+
+  test('rejects one-sided, negative, and over-maximum scores', () => {
+    expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', ca_score: 24 }).success).toBe(false);
+    expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', exam_score: 61 }).success).toBe(false);
+    expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', ca_score: -1, exam_score: 50 }).success).toBe(false);
+    expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', ca_score: 31, exam_score: 50 }).success).toBe(false);
+    expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', ca_score: 20, exam_score: 71 }).success).toBe(false);
+  });
 });
 
 describe('createSemesterSchema', () => {

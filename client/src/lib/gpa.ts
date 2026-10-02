@@ -1,8 +1,11 @@
 // UI adapter over the shared calculation modules.
 // All math and mappings live in @frequency/shared; nothing is duplicated here.
 import { calcCgpa, calcSemester } from '@frequency/shared/calc';
+import { CA_MAX, EXAM_MAX, courseTotal, gradeForTotal } from '@frequency/shared/scores';
 import { classifyCgpa } from '@frequency/shared/classification';
 import type { Course, Semester } from '../types';
+
+export { CA_MAX, EXAM_MAX, courseTotal, gradeForTotal };
 
 export interface Totals {
   units: number;

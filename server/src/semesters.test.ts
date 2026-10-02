@@ -409,3 +409,111 @@ describe('semester submission flow', () => {
     expect(empty.body.cgpa).toBeNull();
   });
 });
+
+describe('optional CA and exam scores', () => {
+  test('grade-only semesters save and read back with null scores', async () => {
+    const created = await api('/api/semesters', {
+      method: 'POST',
+      body: JSON.stringify({
+        level: '300',
+        term: 'First Semester',
+        courses: [{ code: 'HND315', title: 'Metabolic Studies', units: 3, grade: 'A' }]
+      })
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ gp: 5, totalUnits: 3 });
+    const read = await api(`/api/semesters/${(created.body as { id: string }).id}`);
+    expect(read.status).toBe(200);
+    const course = (read.body.semester as { courses: Array<Record<string, unknown>> }).courses[0];
+    expect(course).toMatchObject({ code: 'HND315', grade: 'A', quality_points: 15, ca_score: null, exam_score: null, total_score: null });
+  });
+
+  test('adding both scores later derives and persists grade, points, and GPA', async () => {
+    const list = await api('/api/semesters');
+    const target = (list.body.semesters as Array<{ id: string; term: string }>).find((s) => s.term === 'First Semester')!;
+    const saved = await api(`/api/semesters/${target.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        level: '300',
+        term: 'First Semester',
+        courses: [{ code: 'HND315', title: 'Metabolic Studies', units: 3, grade: 'F', ca_score: 24, exam_score: 61 }]
+      })
+    });
+    // Client-sent F is overridden by the derived A; GPA follows.
+    expect(saved.status).toBe(200);
+    expect(saved.body).toMatchObject({ gp: 5, totalUnits: 3 });
+    const read = await api(`/api/semesters/${target.id}`);
+    const course = (read.body.semester as { courses: Array<Record<string, unknown>> }).courses[0];
+    expect(course).toMatchObject({ grade: 'A', quality_points: 15, ca_score: 24, exam_score: 61, total_score: 85 });
+    const history = await api('/api/semesters');
+    expect(history.body.cgpa).toBeCloseTo(5, 10);
+  });
+
+  test('rejects one-sided, negative, and over-maximum scores without saving', async () => {
+    const list = await api('/api/semesters');
+    const target = (list.body.semesters as Array<{ id: string }>)[0].id;
+    const shapes = [
+      [{ code: 'HND315', units: 3, grade: 'A', ca_score: 24 }],
+      [{ code: 'HND315', units: 3, grade: 'A', exam_score: 61 }],
+      [{ code: 'HND315', units: 3, grade: 'A', ca_score: -1, exam_score: 50 }],
+      [{ code: 'HND315', units: 3, grade: 'A', ca_score: 31, exam_score: 50 }],
+      [{ code: 'HND315', units: 3, grade: 'A', ca_score: 20, exam_score: 71 }]
+    ];
+    for (const courses of shapes) {
+      const r = await api(`/api/semesters/${target}`, {
+        method: 'PUT',
+        body: JSON.stringify({ level: '300', term: 'First Semester', courses })
+      });
+      expect(r.status).toBe(400);
+    }
+    // Nothing persisted from the rejected attempts.
+    const read = await api(`/api/semesters/${target}`);
+    const course = (read.body.semester as { courses: Array<Record<string, unknown>> }).courses[0];
+    expect(course).toMatchObject({ grade: 'A', ca_score: 24, exam_score: 61, total_score: 85 });
+  });
+
+  test('grade-only edits still work and keep scores null', async () => {
+    const created = await api('/api/semesters', {
+      method: 'POST',
+      body: JSON.stringify({
+        level: '300',
+        term: 'Second Semester',
+        courses: [{ code: 'HND316', units: 2, grade: 'B' }]
+      })
+    });
+    expect(created.status).toBe(201);
+    const id = (created.body as { id: string }).id;
+    const saved = await api(`/api/semesters/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ level: '300', term: 'Second Semester', courses: [{ code: 'HND316', units: 2, grade: 'A' }] })
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body).toMatchObject({ gp: 5 });
+    const read = await api(`/api/semesters/${id}`);
+    const course = (read.body.semester as { courses: Array<Record<string, unknown>> }).courses[0];
+    expect(course).toMatchObject({ grade: 'A', ca_score: null, exam_score: null, total_score: null });
+  });
+});
+
+describe('result sheet payload', () => {
+  test('carries every field the printable sheet needs, and nobody elses', async () => {
+    const list = await api('/api/semesters');
+    const target = (list.body.semesters as Array<{ id: string; term: string }>).find((s) => s.term === 'First Semester')!;
+    const semester = await api(`/api/semesters/${target.id}`);
+    expect(semester.status).toBe(200);
+    const s = semester.body.semester as {
+      level: string;
+      term: string;
+      totalUnits: number;
+      totalPoints: number;
+      gp: number;
+      courses: Array<Record<string, unknown>>;
+    };
+    expect(s).toMatchObject({ level: '300', term: 'First Semester', totalUnits: 3, totalPoints: 15, gp: 5 });
+    expect(Object.keys(s.courses[0]).join(',')).toContain('ca_score');
+    const me = await api('/api/auth/me');
+    expect(me.body.user).toMatchObject({ fullName: 'Flow Student', regNumber: 'TST/FLOW01', department: 'Agric Economics' });
+    // Another student cannot open this result sheet.
+    expect((await api(`/api/semesters/${target.id}`, {}, 'second')).status).toBe(404);
+  });
+});

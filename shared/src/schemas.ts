@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { VALID_GRADES } from './gradeScale.js';
+import { CA_MAX, EXAM_MAX } from './scores.js';
 
 export const normalizeRegNumber = (v: string): string =>
   v.trim().toUpperCase().replace(/\s+/g, '');
@@ -15,16 +16,28 @@ const academicIdentity = {
     .transform(normalizeRegNumber)
 };
 
-export const courseSchema = z.object({
-  code: z.string().trim().min(1, 'Course code is required.').max(20),
-  title: z.string().trim().max(120).optional().or(z.literal('')),
-  units: z.number().int('Units must be a whole number.').min(1).max(12),
-  grade: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .refine((g) => VALID_GRADES.includes(g), 'Select a valid grade.')
-});
+const optionalScore = (max: number, label: string) =>
+  z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? undefined : v),
+    z.number({ invalid_type_error: `Enter a valid ${label} score.` }).min(0, `${label} cannot be negative.`).max(max, `${label} cannot exceed ${max}.`).optional()
+  );
+
+export const courseSchema = z
+  .object({
+    code: z.string().trim().min(1, 'Course code is required.').max(20),
+    title: z.string().trim().max(120).optional().or(z.literal('')),
+    units: z.number().int('Units must be a whole number.').min(1).max(12),
+    grade: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .refine((g) => VALID_GRADES.includes(g), 'Select a valid grade.'),
+    ca_score: optionalScore(CA_MAX, 'CA'),
+    exam_score: optionalScore(EXAM_MAX, 'Exam')
+  })
+  .refine((c) => (c.ca_score === undefined) === (c.exam_score === undefined), {
+    message: 'Enter both CA and exam scores, or leave both blank.'
+  });
 
 export const createSemesterSchema = z.object({
   level: z.string().trim().min(1, 'Level is required.').max(20),

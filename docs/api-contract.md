@@ -18,10 +18,15 @@ accounts keep their rows and semesters; their owner links them deliberately via
 
 ## Semesters
 - `GET /semesters` -> 200 { semesters: [...with courses], cgpa, totalUnits, totalPoints }
-- `POST /semesters` { level, term, courses: [{ code, title?, units, grade }] } -> 201 { id, gp, totalUnits }
+- `POST /semesters` { level, term, courses: [{ code, title?, units, grade, ca_score?, exam_score? }] } -> 201 { id, gp, totalUnits }
 - `GET /semesters/:id` -> 200 { semester } | 401 | 404 (ownership-checked)
 - `PUT /semesters/:id` { level, term, courses } -> 200 { id, gp, totalUnits } | 400 | 401 | 404 | 409
 - `DELETE /semesters/:id` -> 200 | 401 | 404 (courses cascade)
+
+Course readings include `ca_score`, `exam_score` (null when never entered), and
+derived `total_score`. When both scores are present the server derives total,
+grade, and points and ignores client-supplied grade/points; with neither, the
+entered grade stands. Exactly one score -> 400. Ranges: CA 0-30, Exam 0-70.
 
 Rules:
 - `UNIQUE(user_id, level, term)` -> 409 on duplicate.
