@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError, api } from '../lib/api.js';
 import type { CoursePayload } from '../lib/api.js';
-import { courseSchema } from '@frequency/shared/schemas';
+import { describeCourseErrors } from '@frequency/shared/courseErrors';
+import type { CourseError } from '@frequency/shared/courseErrors';
 import { CA_MAX, EXAM_MAX, courseTotal, gradeForTotal } from '../lib/gpa.js';
-import { BackBar, EmptyState } from '../components/ui.js';
+import { BackBar, EmptyState, ErrorSummary } from '../components/ui.js';
 
 interface ScoreRow {
   code: string;
@@ -58,27 +59,29 @@ export function AddScores() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const rowErrors = useMemo(
-    () =>
-      rows.map((row) => {
-        const ca = scoreOrUndefined(row.ca);
-        const exam = scoreOrUndefined(row.exam);
-        if (ca === undefined || exam === undefined) {
-          return ['Enter both CA and exam scores for this course.'];
-        }
-        const r = courseSchema.safeParse({
-          code: row.code,
-          title: row.title,
-          units: row.units,
-          grade: gradeForTotal(ca + exam),
-          ca_score: ca,
-          exam_score: exam
-        });
-        return r.success ? [] : r.error.issues.map((i) => i.message);
-      }),
-    [rows]
-  );
+  const rowErrors: string[][] = useMemo(() => {
+    const found = describeCourseErrors(
+      rows.map((row) => ({
+        code: row.code,
+        title: row.title,
+        units: row.units,
+        grade: row.grade,
+        ca_score: scoreOrUndefined(row.ca),
+        exam_score: scoreOrUndefined(row.exam)
+      })),
+      'scores'
+    );
+    const byIndex = new Map(found.map((e: CourseError) => [e.index, e.problems]));
+    return rows.map((_, i) => byIndex.get(i) ?? []);
+  }, [rows]);
   const invalidCount = rowErrors.filter((e) => e.length > 0).length;
+  const summary = rowErrors
+    .map((problems, index) => ({ index, problems }))
+    .filter((e) => e.problems.length > 0);
+
+  function focusCourse(index: number) {
+    document.getElementById(`add-course-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
   function update(index: number, patch: Partial<ScoreRow>) {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
@@ -88,6 +91,7 @@ export function AddScores() {
     setTried(true);
     if (invalidCount > 0) {
       setError('Enter valid CA and exam scores for every course before saving. Nothing was changed.');
+      focusCourse(summary[0].index);
       return;
     }
     setError('');
@@ -126,12 +130,13 @@ export function AddScores() {
             Enter CA and exam scores for every course. Saving converts this semester to Scores + Grade and
             recalculates grades, GPA, and CGPA from your scores.
           </p>
+          {tried && invalidCount > 0 && <ErrorSummary errors={summary} onFocus={focusCourse} />}
           {rows.map((row, i) => {
             const ca = scoreOrUndefined(row.ca);
             const exam = scoreOrUndefined(row.exam);
             const total = ca !== undefined && exam !== undefined ? courseTotal(ca, exam) : null;
             return (
-              <div className="card ccard" key={row.code}>
+              <div className="card ccard" id={`add-course-${i}`} key={row.code}>
                 <div className="ccard__head">
                   <b>{row.code}</b>
                   <span>

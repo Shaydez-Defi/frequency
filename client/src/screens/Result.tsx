@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../lib/api.js';
-import { fmt } from '../lib/gpa.js';
+import { fmt, getGpMessage } from '../lib/gpa.js';
 import { Icon } from '../components/Icons.js';
 
 interface SavedState {
@@ -48,6 +48,7 @@ export function Result() {
         <div className="resmeta">
           {passed.level} · {passed.term}
         </div>
+        <p className="muted center" style={{ margin: '10px 0 0' }}>{getGpMessage(passed.gp).message}</p>
         <div>
           <span className="resunits num">{passed.units} Credit Units</span>
         </div>

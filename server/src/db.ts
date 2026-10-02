@@ -42,6 +42,10 @@ async function sqliteConn(): Promise<SqliteDb> {
     const dbPath = rawUrl.replace(/^file:/, '') || join(here, '..', 'dev.db');
     const db = new DatabaseSync(dbPath) as unknown as SqliteDb;
     db.exec('PRAGMA foreign_keys = ON');
+    // Concurrent readers/writers (dev server + tests + overlapping requests)
+    // must queue instead of throwing SQLITE_BUSY. WAL + a busy timeout.
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA busy_timeout = 5000');
     db.exec(readFileSync(join(here, '..', '..', 'db', 'schema.sql'), 'utf8'));
     const cols = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
     const names = new Set(cols.map((c) => c.name));
@@ -71,6 +75,26 @@ async function sqliteConn(): Promise<SqliteDb> {
     }
     if (!courseNames.has('exam_score')) {
       db.exec(`ALTER TABLE courses ADD COLUMN exam_score REAL`);
+    }
+    // Credit units grew 12 -> 20. SQLite cannot alter a CHECK in place, so
+    // tables still carrying the old CHECK are rebuilt once; data is copied.
+    const coursesSql = db.prepare(`SELECT sql FROM sqlite_master WHERE name = 'courses'`).get() as
+      | { sql: string }
+      | undefined;
+    if (coursesSql?.sql.includes('units <= 12')) {
+      db.exec('PRAGMA foreign_keys = OFF');
+      try {
+        db.exec(
+          `CREATE TABLE courses_new (id TEXT PRIMARY KEY, semester_id TEXT NOT NULL REFERENCES semesters(id) ON DELETE CASCADE, code TEXT NOT NULL, title TEXT, units INTEGER NOT NULL CHECK (units > 0 AND units <= 20), grade TEXT NOT NULL, quality_points REAL NOT NULL, ca_score REAL, exam_score REAL)`
+        );
+        db.exec(
+          `INSERT INTO courses_new (id, semester_id, code, title, units, grade, quality_points, ca_score, exam_score) SELECT id, semester_id, code, title, units, grade, quality_points, ca_score, exam_score FROM courses`
+        );
+        db.exec(`DROP TABLE courses`);
+        db.exec(`ALTER TABLE courses_new RENAME TO courses`);
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
     }
     const semCols = db.prepare('PRAGMA table_info(semesters)').all() as Array<{ name: string }>;
     // Semester entry mode: pre-existing rows default to grade_only.
@@ -134,6 +158,11 @@ async function ensurePg(): Promise<void> {
       await pgPool().query(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id)`);
       await pgPool().query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS ca_score DOUBLE PRECISION`);
       await pgPool().query(`ALTER TABLE courses ADD COLUMN IF NOT EXISTS exam_score DOUBLE PRECISION`);
+      // Credit units grew 12 -> 20: replace the old CHECK, whatever it was named.
+      await pgPool().query(`ALTER TABLE courses DROP CONSTRAINT IF EXISTS courses_units_check`);
+      await pgPool().query(
+        `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'courses_units_check') THEN ALTER TABLE courses ADD CONSTRAINT courses_units_check CHECK (units > 0 AND units <= 20); END IF; END $$`
+      );
       await pgPool().query(`ALTER TABLE semesters ADD COLUMN IF NOT EXISTS entry_mode TEXT NOT NULL DEFAULT 'grade_only'`);
     })();
   }

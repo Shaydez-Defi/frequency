@@ -28,7 +28,17 @@ describe('calcSemester', () => {
   test('rejects invalid units instead of calculating', () => {
     expect(() => calcSemester([{ code: 'CSC 101', units: 0, grade: 'A' }])).toThrow();
     expect(() => calcSemester([{ code: 'CSC 101', units: 2.5, grade: 'A' }])).toThrow();
-    expect(() => calcSemester([{ code: 'CSC 101', units: 13, grade: 'A' }])).toThrow();
+    expect(() => calcSemester([{ code: 'CSC 101', units: 21, grade: 'A' }])).toThrow();
+  });
+
+  test('handles a 20-unit course in GPA math', () => {
+    const r = calcSemester([
+      { code: 'PRJ 499', units: 20, grade: 'A' },
+      { code: 'CSC 101', units: 3, grade: 'C' }
+    ]);
+    expect(r.totalUnits).toBe(23);
+    expect(r.totalPoints).toBe(20 * 5 + 3 * 3);
+    expect(r.gp).toBeCloseTo(109 / 23, 10);
   });
 });
 

@@ -49,6 +49,35 @@ export function EmptyState({ title, children }: { title: string; children: React
   );
 }
 
+export function ErrorSummary({
+  errors,
+  onFocus
+}: {
+  errors: Array<{ index: number; problems: string[] }>;
+  onFocus: (index: number) => void;
+}) {
+  if (errors.length === 0) return null;
+  return (
+    <div className="card" role="alert" style={{ borderColor: 'var(--danger)', marginBottom: 14 }}>
+      <div style={{ fontWeight: 600, marginBottom: 8 }}>Complete these courses before continuing</div>
+      <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6, fontSize: 14 }}>
+        {errors.map((e) => (
+          <li key={e.index}>
+            <button type="button" className="linklike" onClick={() => onFocus(e.index)} style={{ fontWeight: 600 }}>
+              Course {e.index + 1}
+            </button>
+            {e.problems.map((p) => (
+              <div key={p} className="muted">
+                • {p}
+              </div>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function CourseRow({
   code,
   title,

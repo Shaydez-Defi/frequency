@@ -93,7 +93,8 @@ Semester Details has a Print Result Sheet action rendering a clean A4 document
 
 ## Test
 
-- `npm test` (vitest: calc + validation + classification + onboarding-schema units,
+- `npm test` (vitest, files run sequentially: calc + validation + classification + onboarding-schema units,
   Google API flows on scratch DBs: initiation, state guards, onboarding, legacy
   claim, sessions, ownership, retired-route 404s, plus submit, read-one, edit,
-  delete, duplicate 409, invalid 400, CGPA effects, per-student ownership)
+  delete, duplicate 409, invalid 400, CGPA effects, per-student ownership,
+  plus a multi-user concurrency file proving parallel requests stay isolated)

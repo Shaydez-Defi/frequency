@@ -166,6 +166,12 @@ describe('semester submission flow', () => {
     const r = await api('/api/semesters');
     expect(r.status).toBe(401);
     jars.default = saved;
+    // The test-only legacy seeder is not registered without its env flag.
+    const seed = await api('/api/auth/_test/legacy', {
+      method: 'POST',
+      body: JSON.stringify({ fullName: 'X', department: 'Y', regNumber: 'Z/1' })
+    });
+    expect(seed.status).toBe(404);
   });
 
   test('saves a semester and returns the server-calculated GP', async () => {
@@ -599,6 +605,43 @@ describe('optional CA and exam scores', () => {
     const read = await api(`/api/semesters/${id}`);
     const course = (read.body.semester as { courses: Array<Record<string, unknown>> }).courses[0];
     expect(course).toMatchObject({ grade: 'A', ca_score: null, exam_score: null, total_score: null });
+  });
+});
+
+describe('20-unit courses end to end', () => {
+  test('a 20-unit course saves, persists, and calculates correctly', async () => {
+    const created = await api('/api/semesters', {
+      method: 'POST',
+      body: JSON.stringify({
+        level: '400',
+        term: 'First Semester',
+        entryMode: 'grade_only',
+        courses: [
+          { code: 'PRJ 499', title: 'Final Year Project', units: 20, grade: 'A' },
+          { code: 'CSC 401', units: 3, grade: 'C' }
+        ]
+      })
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ totalUnits: 23 });
+    const id = (created.body as { id: string }).id;
+    const read = await api(`/api/semesters/${id}`);
+    const semester = read.body.semester as { gp: number; courses: Array<{ code: string; units: number }> };
+    expect(semester.gp).toBeCloseTo(109 / 23, 10);
+    expect(semester.courses.find((c) => c.code === 'PRJ 499')).toMatchObject({ units: 20 });
+    // 21 units is refused and changes nothing.
+    const bad = await api(`/api/semesters/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        level: '400',
+        term: 'First Semester',
+        courses: [{ code: 'PRJ 499', units: 21, grade: 'A' }]
+      })
+    });
+    expect(bad.status).toBe(400);
+    const intact = await api(`/api/semesters/${id}`);
+    expect((intact.body.semester as { courses: unknown[] }).courses).toHaveLength(2);
+    expect((await api(`/api/semesters/${id}`, { method: 'DELETE' })).status).toBe(200);
   });
 });
 

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../lib/api.js';
 import { toSavedSemester, newestFirst } from '../lib/semesters.js';
 import type { SavedSemester } from '../lib/semesters.js';
-import { classify, fmt } from '../lib/gpa.js';
+import { classify, fmt, getGpMessage } from '../lib/gpa.js';
 import { useAuth } from '../auth/AuthContext.js';
 import { Icon } from '../components/Icons.js';
 import { EmptyState } from '../components/ui.js';
@@ -50,10 +50,11 @@ export function Dashboard() {
         <p className="form-error" role="alert">{error}</p>
       ) : hasRecords && cgpa !== null ? (
         <div className="card cgpacard">
-          <span className="cgpacard__bgs">BGS</span>
+          <span className="cgpacard__bgs">{getGpMessage(cgpa).stamp}</span>
           <div className="cgpacard__lbl">Cumulative CGPA</div>
           <div className="cgpacard__big num">{fmt(cgpa)}</div>
           <span className="cgpacard__cls">{classify(cgpa)}</span>
+          <div className="cgpacard__msg">{getGpMessage(cgpa).message}</div>
         </div>
       ) : (
         <div className="card">

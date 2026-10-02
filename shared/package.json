@@ -14,6 +14,8 @@
     "./calc": "./dist/calc.js",
     "./schemas": "./dist/schemas.js",
     "./scores": "./dist/scores.js",
+    "./courseErrors": "./dist/courseErrors.js",
+    "./gpMessages": "./dist/gpMessages.js",
     "./classification": "./dist/classification.js"
   }
 }

@@ -3,11 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError, api } from '../lib/api.js';
 import type { CoursePayload, EntryMode } from '../lib/api.js';
 import { GRADES } from '../types.js';
-import { courseSchema } from '@frequency/shared/schemas';
-import { CA_MAX, EXAM_MAX, courseTotal, gradeForTotal } from '../lib/gpa.js';
+import { describeCourseErrors } from '@frequency/shared/courseErrors';
+import type { CourseError } from '@frequency/shared/courseErrors';
+import { CA_MAX, EXAM_MAX, MAX_COURSE_UNITS, courseTotal, gradeForTotal } from '../lib/gpa.js';
 import { modeLabel } from '../lib/semesters.js';
 import { Select } from '../components/Select.js';
-import { BackBar, EmptyState } from '../components/ui.js';
+import { BackBar, EmptyState, ErrorSummary } from '../components/ui.js';
 import { derivedGrade } from './CourseEntry.js';
 
 interface Row {
@@ -23,7 +24,7 @@ const blankRow = (): Row => ({ code: '', title: '', units: '2', grade: '', ca: '
 
 function validUnits(raw: string): number {
   const u = Number(raw);
-  return Number.isInteger(u) && u >= 1 && u <= 12 ? u : Number.NaN;
+  return Number.isInteger(u) && u >= 1 && u <= MAX_COURSE_UNITS ? u : Number.NaN;
 }
 
 function scoreOrUndefined(raw: string): number | undefined {
@@ -68,36 +69,32 @@ export function EditSemester() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const rowErrors = useMemo(
-    () =>
-      rows.map((row) => {
-        if (!scoresMode) {
-          const r = courseSchema.safeParse({
-            code: row.code,
-            title: row.title,
-            units: row.units.trim() === '' ? Number.NaN : Number(row.units),
-            grade: row.grade
-          });
-          return r.success ? [] : r.error.issues.map((i) => i.message);
-        }
-        const ca = scoreOrUndefined(row.ca);
-        const exam = scoreOrUndefined(row.exam);
-        if (ca === undefined || exam === undefined) {
-          return ['Enter both CA and exam scores for this course.'];
-        }
-        const r = courseSchema.safeParse({
+  const rowErrors: string[][] = useMemo(
+    () => {
+      const found = describeCourseErrors(
+        rows.map((row) => ({
           code: row.code,
           title: row.title,
           units: row.units.trim() === '' ? Number.NaN : Number(row.units),
-          grade: gradeForTotal(ca + exam),
-          ca_score: ca,
-          exam_score: exam
-        });
-        return r.success ? [] : r.error.issues.map((i) => i.message);
-      }),
+          grade: row.grade,
+          ca_score: scoresMode ? scoreOrUndefined(row.ca) : undefined,
+          exam_score: scoresMode ? scoreOrUndefined(row.exam) : undefined
+        })),
+        scoresMode ? 'scores' : 'grade_only'
+      );
+      const byIndex = new Map(found.map((e: CourseError) => [e.index, e.problems]));
+      return rows.map((_, i) => byIndex.get(i) ?? []);
+    },
     [rows, scoresMode]
   );
   const invalidCount = rowErrors.filter((e) => e.length > 0).length;
+  const summary = rowErrors
+    .map((problems, index) => ({ index, problems }))
+    .filter((e) => e.problems.length > 0);
+
+  function focusCourse(index: number) {
+    document.getElementById(`edit-course-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
   const units = useMemo(() => rows.reduce((s, r) => s + (validUnits(r.units) || 0), 0), [rows]);
 
@@ -110,7 +107,7 @@ export function EditSemester() {
       prev.map((r, i) => {
         if (i !== index) return r;
         const current = validUnits(r.units);
-        return { ...r, units: String(Math.min(12, Math.max(1, (Number.isNaN(current) ? 1 : current) + delta))) };
+        return { ...r, units: String(Math.min(MAX_COURSE_UNITS, Math.max(1, (Number.isNaN(current) ? 1 : current) + delta))) };
       })
     );
   }
@@ -172,12 +169,13 @@ export function EditSemester() {
               CA and Exam are editable. Total, grade, and points recalculate on save.
             </p>
           )}
+          {tried && invalidCount > 0 && <ErrorSummary errors={summary} onFocus={focusCourse} />}
           {rows.map((row, i) => {
             const ca = scoreOrUndefined(row.ca);
             const exam = scoreOrUndefined(row.exam);
             const total = scoresMode && ca !== undefined && exam !== undefined ? courseTotal(ca, exam) : null;
             return (
-              <div className="card ccard" key={i}>
+              <div className="card ccard" id={`edit-course-${i}`} key={i}>
                 <div className="ccard__head">
                   Course <b>{String(i + 1).padStart(2, '0')}</b>
                   {rows.length > 1 && (

@@ -119,6 +119,7 @@ body { margin: 0; }
 .cgpacard__lbl { font-size: 13px; opacity: 0.85; margin-bottom: 8px; }
 .cgpacard__big { font-size: 56px; line-height: 1.05; font-weight: 500; }
 .cgpacard__cls { display: inline-block; margin-top: 10px; background: rgba(255, 255, 255, 0.16); padding: 6px 14px; border-radius: 999px; font-size: 13.5px; }
+.cgpacard__msg { margin-top: 10px; font-size: 13.5px; line-height: 20px; opacity: 0.9; }
 .cgpacard__bgs { position: absolute; top: 18px; right: 18px; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 8px; padding: 4px 9px; font-size: 12px; letter-spacing: 0.06em; }
 
 .calc-card { display: flex; align-items: center; gap: 14px; cursor: pointer; width: 100%; text-align: left; transition: transform 0.12s ease-out; }
@@ -346,20 +347,30 @@ body { margin: 0; }
 }
 
 /* result sheet: plain document, print-optimized */
-.sheet { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 24px 22px; }
+.sheet { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 24px 22px; max-width: 100%; overflow: hidden; }
 .sheet__title { text-align: center; font-size: 22px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 20px; color: var(--ink); }
 .sheet__who { display: grid; gap: 8px; margin: 0 0 20px; }
 .sheet__who > div { display: flex; gap: 12px; font-size: 14.5px; }
 .sheet__who dt { min-width: 168px; color: var(--ink-2); }
-.sheet__who dd { margin: 0; font-weight: 500; }
-.sheet__table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.sheet__table th, .sheet__table td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+.sheet__who dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.sheet__scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+.sheet__table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13.5px; }
+.sheet__table th, .sheet__table td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); overflow-wrap: break-word; }
 .sheet__table thead th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); border-bottom: 2px solid var(--ink); }
 .sheet__sums { display: grid; gap: 8px; margin: 20px 0 0; }
 .sheet__sums > div { display: flex; gap: 12px; font-size: 14.5px; }
 .sheet__sums dt { min-width: 168px; color: var(--ink-2); }
 .sheet__sums dd { margin: 0; font-weight: 600; }
 .sheet__note { margin: 22px 0 0; font-size: 12px; color: var(--ink-2); text-align: center; }
+
+@media (max-width: 480px) {
+  .sheet { padding: 16px 12px; border-radius: 12px; }
+  .sheet__title { font-size: 18px; }
+  .sheet__who > div, .sheet__sums > div { font-size: 13.5px; }
+  .sheet__who dt, .sheet__sums dt { min-width: 118px; }
+  .sheet__table { font-size: 12px; }
+  .sheet__table th, .sheet__table td { padding: 7px 6px; }
+}
 
 @page { size: A4; margin: 12mm; }
 

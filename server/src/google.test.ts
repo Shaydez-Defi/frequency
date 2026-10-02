@@ -1,6 +1,6 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,16 +59,10 @@ async function googleOnboard(code: string, profile: { fullName: string; departme
 }
 
 function seedLegacy(profile: { fullName: string; department: string; regNumber: string }) {
-  const file = join(dir, 'legacy.json');
-  writeFileSync(file, JSON.stringify(profile));
-  const r = spawnSync('npx tsx src/testSeed.ts', [file], {
-    cwd: here,
-    shell: true,
-    env: { ...process.env, DATABASE_URL: `file:${join(dir, 'test.db')}` },
-    encoding: 'utf8'
+  return api('/api/auth/_test/legacy', { method: 'POST', body: JSON.stringify(profile) }).then((r) => {
+    if (r.status !== 201 && r.status !== 200) throw new Error(`seed failed: ${r.status} ${JSON.stringify(r.body)}`);
+    return r.body as { id: string; existed: boolean };
   });
-  if (r.status !== 0) throw new Error(`seed failed: ${r.stderr}`);
-  return JSON.parse(r.stdout) as { id: string; existed: boolean };
 }
 
 function freePort(): Promise<number> {
@@ -137,7 +131,8 @@ beforeAll(async () => {
       GOOGLE_REDIRECT_URI: 'http://localhost/callback',
       GOOGLE_TEST_SUB: 'google-sub-001',
       GOOGLE_TEST_EMAIL: 'google.student@example.com',
-      GOOGLE_TEST_NAME: 'Google Student'
+      GOOGLE_TEST_NAME: 'Google Student',
+      ALLOW_TEST_SEED: '1'
     },
     stdio: 'ignore'
   });
@@ -293,7 +288,7 @@ describe('returning google user', () => {
 
 describe('legacy account claim', () => {
   test('silently taking over an old registration number is refused', async () => {
-    seedLegacy({ fullName: 'Old Student', department: 'Soil Science', regNumber: 'OLD/2024/0001' });
+    await seedLegacy({ fullName: 'Old Student', department: 'Soil Science', regNumber: 'OLD/2024/0001' });
     const { cb, done } = await googleOnboard('claim-code', {
       fullName: 'Old Student',
       department: 'Soil Science',

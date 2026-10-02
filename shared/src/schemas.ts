@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { VALID_GRADES } from './gradeScale.js';
+import { MAX_COURSE_UNITS } from './calc.js';
 import { CA_MAX, EXAM_MAX } from './scores.js';
 
 export const normalizeRegNumber = (v: string): string =>
@@ -26,7 +27,7 @@ export const courseSchema = z
   .object({
     code: z.string().trim().min(1, 'Course code is required.').max(20),
     title: z.string().trim().max(120).optional().or(z.literal('')),
-    units: z.number().int('Units must be a whole number.').min(1).max(12),
+    units: z.number().int('Units must be a whole number.').min(1).max(MAX_COURSE_UNITS),
     grade: z
       .string()
       .trim()

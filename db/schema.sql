@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS courses (
   semester_id TEXT NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
   code TEXT NOT NULL,
   title TEXT,
-  units INTEGER NOT NULL CHECK (units > 0 AND units <= 12),
+  units INTEGER NOT NULL CHECK (units > 0 AND units <= 20),
   grade TEXT NOT NULL,
   quality_points REAL NOT NULL,
   ca_score REAL,

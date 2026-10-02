@@ -1,11 +1,14 @@
 // UI adapter over the shared calculation modules.
 // All math and mappings live in @frequency/shared; nothing is duplicated here.
-import { calcCgpa, calcSemester } from '@frequency/shared/calc';
+import { MAX_COURSE_UNITS, calcCgpa, calcSemester } from '@frequency/shared/calc';
 import { CA_MAX, EXAM_MAX, courseTotal, gradeForTotal } from '@frequency/shared/scores';
+import { getGpMessage } from '@frequency/shared/gpMessages';
+import type { GpMessage } from '@frequency/shared/gpMessages';
 import { classifyCgpa } from '@frequency/shared/classification';
 import type { Course, Semester } from '../types';
 
-export { CA_MAX, EXAM_MAX, courseTotal, gradeForTotal };
+export { CA_MAX, EXAM_MAX, MAX_COURSE_UNITS, courseTotal, getGpMessage, gradeForTotal };
+export type { GpMessage };
 
 export interface Totals {
   units: number;

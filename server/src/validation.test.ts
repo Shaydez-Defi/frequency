@@ -22,6 +22,11 @@ describe('courseSchema', () => {
     expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: '' }).success).toBe(false);
   });
 
+  test('accepts up to 20 credit units and rejects 21', () => {
+    expect(courseSchema.safeParse({ code: 'PRJ 499', units: 20, grade: 'A' }).success).toBe(true);
+    expect(courseSchema.safeParse({ code: 'PRJ 499', units: 21, grade: 'A' }).success).toBe(false);
+  });
+
   test('accepts optional CA and exam scores within range', () => {
     expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', ca_score: 24, exam_score: 61 }).success).toBe(true);
     expect(courseSchema.safeParse({ code: 'CSC 101', units: 3, grade: 'A', ca_score: '', exam_score: '' }).success).toBe(true);

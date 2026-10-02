@@ -1,5 +1,9 @@
 import { GRADE_POINTS } from './gradeScale.js';
 
+// Maximum credit units for one course. Shared by validation, calculation,
+// and UI steppers: change it here, nowhere else.
+export const MAX_COURSE_UNITS = 20;
+
 export interface CourseInput {
   code: string;
   title?: string;
@@ -25,7 +29,7 @@ export function calcSemester(courses: CourseInput[]): SemesterTotals {
   for (const c of courses) {
     const p = pointsFor(c.grade);
     if (p === null) throw new Error(`Unknown grade: ${c.grade}`);
-    if (!Number.isInteger(c.units) || c.units < 1 || c.units > 12) {
+    if (!Number.isInteger(c.units) || c.units < 1 || c.units > MAX_COURSE_UNITS) {
       throw new Error(`Invalid units for ${c.code}`);
     }
     totalUnits += c.units;

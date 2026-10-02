@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { MAX_COURSE_UNITS } from '../lib/gpa.js';
 import type { EntryMode } from '../lib/api.js';
 
 export interface CourseDraft {
@@ -63,7 +64,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
       prev.map((c, i) => {
         if (i !== index) return c;
         const current = Number.parseInt(c.units, 10);
-        const next = Math.min(12, Math.max(1, (Number.isInteger(current) ? current : 1) + delta));
+        const next = Math.min(MAX_COURSE_UNITS, Math.max(1, (Number.isInteger(current) ? current : 1) + delta));
         return { ...c, units: String(next) };
       })
     );

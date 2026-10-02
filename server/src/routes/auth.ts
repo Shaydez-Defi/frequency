@@ -35,6 +35,44 @@ const toPublic = (row: UserRow) => ({
 
 export const authRouter = Router();
 
+// Test-only legacy seeder: inserts a pre-Google student row (records intact,
+// no Google identity) so the deliberate claim flow is provable. Registered
+// ONLY when ALLOW_TEST_SEED=1, which no production or preview environment
+// sets. Without the flag this route does not exist and returns 404.
+if (process.env.ALLOW_TEST_SEED === '1') {
+  authRouter.post(
+    '/_test/legacy',
+    ah(async (req, res) => {
+      const { fullName, department, regNumber } = req.body as Record<string, unknown>;
+      if (
+        typeof fullName !== 'string' ||
+        typeof department !== 'string' ||
+        typeof regNumber !== 'string' ||
+        !fullName.trim() ||
+        !department.trim() ||
+        !regNumber.trim()
+      ) {
+        res.status(400).json({ error: 'fullName, department, and regNumber are required.' });
+        return;
+      }
+      const existing = await queryGet<{ id: string }>('SELECT id FROM users WHERE reg_number = ?', regNumber.trim());
+      if (existing) {
+        res.json({ id: existing.id, existed: true });
+        return;
+      }
+      const id = randomUUID();
+      await queryRun(
+        'INSERT INTO users (id, full_name, department, reg_number, google_id, google_email) VALUES (?, ?, ?, ?, NULL, NULL)',
+        id,
+        fullName.trim(),
+        department.trim(),
+        regNumber.trim()
+      );
+      res.status(201).json({ id, existed: false });
+    })
+  );
+}
+
 authRouter.post('/logout', (_req, res) => {
   clearAuthCookie(res);
   res.json({ ok: true });
