@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { changePasswordSchema, updateProfileSchema } from '@frequency/shared/schemas';
+import { completeGoogleProfileSchema, updateProfileSchema } from '@frequency/shared/schemas';
 
 describe('updateProfileSchema', () => {
   test('accepts name and/or department edits, never a registration number', () => {
@@ -13,19 +13,47 @@ describe('updateProfileSchema', () => {
   });
 });
 
-describe('changePasswordSchema', () => {
-  test('requires the current password, a long-enough match, and confirmation', () => {
+describe('completeGoogleProfileSchema', () => {
+  test('accepts academic identity with an optional explicit claim flag', () => {
+    const r = completeGoogleProfileSchema.safeParse({
+      fullName: 'Ada Eze',
+      department: 'Agric Economics',
+      regNumber: 'fehnd/2024/0001'
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.regNumber).toBe('FEHND/2024/0001');
     expect(
-      changePasswordSchema.safeParse({ currentPassword: 'old12345', newPassword: 'new12345', confirmPassword: 'new12345' }).success
+      completeGoogleProfileSchema.safeParse({
+        fullName: 'Ada Eze',
+        department: 'Agric Economics',
+        regNumber: 'FEHND/2024/0001',
+        claimExisting: true
+      }).success
     ).toBe(true);
+  });
+
+  test('never trusts client-supplied Google identity material', () => {
+    const r = completeGoogleProfileSchema.safeParse({
+      fullName: 'Ada Eze',
+      department: 'Agric Economics',
+      regNumber: 'FEHND/2024/0001',
+      sub: 'hacker-sub',
+      email: 'hacker@example.com'
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect('sub' in r.data).toBe(false);
+      expect('email' in r.data).toBe(false);
+    }
+  });
+
+  test('rejects short names and short registration numbers', () => {
     expect(
-      changePasswordSchema.safeParse({ currentPassword: '', newPassword: 'new12345', confirmPassword: 'new12345' }).success
+      completeGoogleProfileSchema.safeParse({ fullName: 'A', department: 'Agric', regNumber: 'FEHND/2024/0001' }).success
     ).toBe(false);
-    expect(
-      changePasswordSchema.safeParse({ currentPassword: 'old12345', newPassword: 'short', confirmPassword: 'short' }).success
-    ).toBe(false);
-    expect(
-      changePasswordSchema.safeParse({ currentPassword: 'old12345', newPassword: 'new12345', confirmPassword: 'other123' }).success
-    ).toBe(false);
+    expect(completeGoogleProfileSchema.safeParse({ fullName: 'Ada Eze', department: 'A', regNumber: 'FEHND/2024/0001' }).success).toBe(
+      false
+    );
+    expect(completeGoogleProfileSchema.safeParse({ fullName: 'Ada Eze', department: 'Agric', regNumber: 'X' }).success).toBe(false);
   });
 });

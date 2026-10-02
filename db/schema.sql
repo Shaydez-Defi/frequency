@@ -1,6 +1,6 @@
 -- V1 schema: SQLite-compatible (migrates cleanly to Postgres later).
+-- Rule: Google is the only authentication (google_id UNIQUE when present).
 -- Rule: reg_number is an identifier (UNIQUE), never a password.
--- Rule: store password_hash only (bcrypt), never plaintext.
 -- Rule: store course rows, not just GP. GP/CGPA are derived.
 -- Rule: prevent duplicate (user_id, level, term) at the DB level.
 
@@ -9,10 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   full_name TEXT NOT NULL,
   department TEXT NOT NULL DEFAULT '',
   reg_number TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  google_id TEXT,
+  google_id TEXT UNIQUE,
   google_email TEXT,
-  has_password INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

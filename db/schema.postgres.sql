@@ -1,16 +1,14 @@
 -- V1 schema for Postgres (Vercel Postgres / Neon).
--- Mirrors db/schema.sql. Same rules: reg_number UNIQUE identifier,
--- password_hash only, course rows always stored, UNIQUE(user_id, level, term).
+-- Mirrors db/schema.sql. Same rules: Google-only auth, reg_number UNIQUE
+-- identifier, course rows always stored, UNIQUE(user_id, level, term).
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   full_name TEXT NOT NULL,
   department TEXT NOT NULL DEFAULT '',
   reg_number TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  google_id TEXT,
+  google_id TEXT UNIQUE,
   google_email TEXT,
-  has_password INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

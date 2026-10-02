@@ -1,6 +1,6 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,12 +8,13 @@ import { dirname } from 'node:path';
 import { createServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { completeGoogleProfileSchema, setupPasswordSchema } from '@frequency/shared/schemas';
+import { googleConfig } from './google.js';
+import { completeGoogleProfileSchema } from '@frequency/shared/schemas';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-// Minimal cookie jar: tracks every Set-Cookie by name so OAuth state,
-// pending identity, and auth cookies survive redirects like a browser.
+// Browser-like cookie jar: every Set-Cookie survives by name so OAuth state,
+// pending identity, and auth cookies round-trip across redirects.
 let jar = new Map<string, string>();
 let base = '';
 let child: ChildProcess | null = null;
@@ -41,13 +42,33 @@ async function api(path: string, options: RequestInit = {}) {
       const name = pair.slice(0, eq).trim();
       const value = pair.slice(eq + 1).trim();
       if (/expires=thu, 01 jan 1970/i.test(c) || value === '') jar.delete(name);
-      else jar.set(name, value);
+      else jar.set(name, decodeURIComponent(value));
     }
   }
-  // fetch() percent-encodes cookie values; the OAuth state must round-trip exactly.
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  const text = res.headers.get('location') ?? '';
-  return { status: res.status, body, location: text };
+  return { status: res.status, body, location: res.headers.get('location') ?? '' };
+}
+
+async function googleOnboard(code: string, profile: { fullName: string; department: string; regNumber: string; claimExisting?: boolean }) {
+  jar.clear();
+  await api('/api/auth/google');
+  const state = jar.get('g_state') ?? '';
+  const cb = await api(`/api/auth/google/callback?code=${code}&state=${state}`);
+  const done = await api('/api/auth/google/complete', { method: 'POST', body: JSON.stringify(profile) });
+  return { cb, done };
+}
+
+function seedLegacy(profile: { fullName: string; department: string; regNumber: string }) {
+  const file = join(dir, 'legacy.json');
+  writeFileSync(file, JSON.stringify(profile));
+  const r = spawnSync('npx tsx src/testSeed.ts', [file], {
+    cwd: here,
+    shell: true,
+    env: { ...process.env, DATABASE_URL: `file:${join(dir, 'test.db')}` },
+    encoding: 'utf8'
+  });
+  if (r.status !== 0) throw new Error(`seed failed: ${r.stderr}`);
+  return JSON.parse(r.stdout) as { id: string; existed: boolean };
 }
 
 function freePort(): Promise<number> {
@@ -133,205 +154,234 @@ afterAll(async () => {
   }
 });
 
-describe('google schemas', () => {
-  test('complete profile requires academic identity, never a Google subject', () => {
-    expect(
-      completeGoogleProfileSchema.safeParse({ fullName: 'Ada Eze', department: 'Agric', regNumber: 'FEHND/2024/0001' }).success
-    ).toBe(true);
+describe('google configuration contract', () => {
+  test('googleConfig stays null without credentials (graceful degradation)', () => {
+    expect(googleConfig()).toBeNull();
+  });
+
+  test('complete profile schema ignores client-supplied Google identity', () => {
     const r = completeGoogleProfileSchema.safeParse({
       fullName: 'Ada Eze',
       department: 'Agric',
       regNumber: 'fehnd/2024/0001',
-      sub: 'hacker-sub'
+      sub: 'hacker-sub',
+      email: 'hacker@example.com'
     });
     expect(r.success).toBe(true);
     if (r.success) {
       expect('sub' in r.data).toBe(false);
+      expect('email' in r.data).toBe(false);
       expect(r.data.regNumber).toBe('FEHND/2024/0001');
     }
-    expect(completeGoogleProfileSchema.safeParse({ fullName: 'A', department: 'Agric', regNumber: 'X1' }).success).toBe(false);
-  });
-
-  test('setup password requires a matching confirmation', () => {
-    expect(setupPasswordSchema.safeParse({ newPassword: 'newpass1234', confirmPassword: 'newpass1234' }).success).toBe(true);
-    expect(setupPasswordSchema.safeParse({ newPassword: 'short', confirmPassword: 'short' }).success).toBe(false);
-    expect(setupPasswordSchema.safeParse({ newPassword: 'newpass1234', confirmPassword: 'other1234' }).success).toBe(false);
   });
 });
 
-describe('google sign-in flow (mocked identity)', () => {
-  test('authorize redirects to Google with state cookies', async () => {
+describe('oauth initiation', () => {
+  test('redirects to Google with client id, redirect uri, scopes, and state', async () => {
     jar.clear();
-    const r = await api('/api/auth/google?intent=login');
+    const r = await api('/api/auth/google');
     expect(r.status).toBe(302);
     expect(r.location).toContain('accounts.google.com');
-    expect(jar.get('g_state')).toBeTruthy();
-    expect(jar.get('g_intent')).toBe('login');
-  });
-
-  test('callback rejects a forged state (CSRF)', async () => {
-    const r = await api('/api/auth/google/callback?code=anything&state=forged-state-value-000000');
-    expect(r.status).toBe(302);
-    expect(r.location).toContain('invalid_state');
-  });
-
-  test('first-time Google identity creates a student via complete-profile', async () => {
-    jar.clear();
-    await api('/api/auth/google?intent=login');
+    expect(r.location).toContain('client_id=test-client-id');
+    expect(r.location).toContain('scope=openid');
+    expect(r.location).toContain('redirect_uri=');
     const state = jar.get('g_state') ?? '';
-    const cb = await api(`/api/auth/google/callback?code=test-code&state=${state}`);
+    expect(state).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.location).toContain(`state=${state}`);
+  });
+
+  test('old link intent URL still lands on the same login flow', async () => {
+    jar.clear();
+    const r = await api('/api/auth/google?intent=link');
+    expect(r.status).toBe(302);
+    expect(r.location).toContain('accounts.google.com');
+  });
+});
+
+describe('oauth callback guards', () => {
+  test('rejects forged state, missing code, and provider denials', async () => {
+    jar.clear();
+    const forged = await api('/api/auth/google/callback?code=x&state=forged-state-value-000000');
+    expect(forged.status).toBe(302);
+    expect(forged.location).toContain('invalid_state');
+    await api('/api/auth/google');
+    const state = jar.get('g_state') ?? '';
+    const noCode = await api(`/api/auth/google/callback?state=${state}`);
+    expect(noCode.status).toBe(302);
+    expect(noCode.location).toContain('invalid_request');
+    const denied = await api(`/api/auth/google/callback?error=access_denied&state=${state}`);
+    expect(denied.status).toBe(302);
+    expect(denied.location).toContain('access_denied');
+  });
+});
+
+describe('first-time onboarding', () => {
+  test('verified identity without an account lands on complete-profile with pending email', async () => {
+    jar.clear();
+    await api('/api/auth/google');
+    const state = jar.get('g_state') ?? '';
+    const cb = await api('/api/auth/google/callback?code=test-code&state=' + state);
     expect(cb.status).toBe(302);
     expect(cb.location).toContain('/complete-profile');
     expect(jar.get('g_pending')).toBeTruthy();
+    const pending = await api('/api/auth/google/pending');
+    expect(pending.status).toBe(200);
+    expect(pending.body.pending).toMatchObject({ email: 'google.student@example.com', name: 'Google Student' });
+  });
 
+  test('completing the profile creates the student and signs in', async () => {
     const done = await api('/api/auth/google/complete', {
       method: 'POST',
       body: JSON.stringify({ fullName: 'Google Student', department: 'Crop Science', regNumber: 'GOO/2024/0001' })
     });
     expect(done.status).toBe(201);
-    expect(done.body.user).toMatchObject({ regNumber: 'GOO/2024/0001', googleEmail: 'google.student@example.com', hasPassword: false });
+    expect(done.body.user).toMatchObject({
+      fullName: 'Google Student',
+      department: 'Crop Science',
+      regNumber: 'GOO/2024/0001',
+      googleEmail: 'google.student@example.com'
+    });
     expect(JSON.stringify(done.body)).not.toContain('google-sub-001'.slice(0, 0) + 'password');
-    const me = await api('/api/auth/me');
-    expect(me.status).toBe(200);
-    expect(me.body.user).toMatchObject({ googleEmail: 'google.student@example.com', hasPassword: false });
-  });
-
-  test('returning Google identity logs straight in (no duplicate account)', async () => {
-    jar.clear();
-    await api('/api/auth/google?intent=login');
-    const state = jar.get('g_state') ?? '';
-    const cb = await api(`/api/auth/google/callback?code=test-code&state=${state}`);
-    expect(cb.status).toBe(302);
-    expect(cb.location).toContain('/dashboard');
     const me = await api('/api/auth/me');
     expect(me.status).toBe(200);
     expect(me.body.user).toMatchObject({ regNumber: 'GOO/2024/0001' });
   });
 
-  test('disconnect is blocked until a password exists, then setup unlocks it', async () => {
-    const blocked = await api('/api/auth/google/disconnect', { method: 'POST' });
-    expect(blocked.status).toBe(409);
-    const setup = await api('/api/auth/password/setup', {
-      method: 'POST',
-      body: JSON.stringify({ newPassword: 'gpass12345', confirmPassword: 'gpass12345' })
-    });
-    expect(setup.status).toBe(200);
-    const again = await api('/api/auth/password/setup', {
-      method: 'POST',
-      body: JSON.stringify({ newPassword: 'other12345', confirmPassword: 'other12345' })
-    });
-    expect(again.status).toBe(400);
-    const ok = await api('/api/auth/google/disconnect', { method: 'POST' });
-    expect(ok.status).toBe(200);
-    const me = await api('/api/auth/me');
-    expect(me.body.user).toMatchObject({ googleEmail: null, hasPassword: true });
-    // Password login still works after disconnecting Google.
+  test('rejects invalid onboarding bodies and expired pending sessions', async () => {
     jar.clear();
-    const login = await api('/api/auth/login', {
+    await api('/api/auth/google');
+    const fresh = jar.get('g_state') ?? '';
+    await api('/api/auth/google/callback?code=fresh-code&state=' + fresh);
+    const bad = await api('/api/auth/google/complete', {
       method: 'POST',
-      body: JSON.stringify({ regNumber: 'GOO/2024/0001', password: 'gpass12345' })
+      body: JSON.stringify({ fullName: 'A', department: 'Crop Science', regNumber: 'GOO/2024/0002' })
     });
-    expect(login.status).toBe(200);
+    expect(bad.status).toBe(400);
+    jar.clear();
+    const expired = await api('/api/auth/google/complete', {
+      method: 'POST',
+      body: JSON.stringify({ fullName: 'Nobody', department: 'Crop Science', regNumber: 'GOO/2024/0002' })
+    });
+    expect(expired.status).toBe(401);
+    expect((await api('/api/auth/google/pending')).status).toBe(401);
   });
 
-  test('password account links Google deliberately from Profile', async () => {
-    jar.clear();
-    const reg = await api('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        fullName: 'Link Student',
-        department: 'Soil Science',
-        regNumber: 'LNK/2024/0001',
-        password: 'linkpass123',
-        confirmPassword: 'linkpass123'
-      })
+  test('rejects a registration number already owned by another Google account', async () => {
+    const { done } = await googleOnboard('other-code', {
+      fullName: 'Copy Cat',
+      department: 'Agric',
+      regNumber: 'GOO/2024/0001'
     });
-    expect(reg.status).toBe(201);
-    await api('/api/auth/google?intent=link');
+    expect(done.status).toBe(409);
+    expect(done.body.code).not.toBe('NEEDS_CLAIM');
+  });
+});
+
+describe('returning google user', () => {
+  test('same Google account logs straight into the same student, never a duplicate', async () => {
+    jar.clear();
+    await api('/api/auth/google');
     const state = jar.get('g_state') ?? '';
-    const cb = await api(`/api/auth/google/callback?code=test-code&state=${state}`);
+    const cb = await api('/api/auth/google/callback?code=test-code&state=' + state);
     expect(cb.status).toBe(302);
-    expect(cb.location).toContain('/profile?linked=1');
+    expect(cb.location).toContain('/dashboard');
     const me = await api('/api/auth/me');
     expect(me.status).toBe(200);
-    expect(me.body.user).toMatchObject({ regNumber: 'LNK/2024/0001', googleEmail: 'google.student@example.com' });
+    expect(me.body.user).toMatchObject({ regNumber: 'GOO/2024/0001', googleEmail: 'google.student@example.com' });
+  });
+});
+
+describe('legacy account claim', () => {
+  test('silently taking over an old registration number is refused', async () => {
+    seedLegacy({ fullName: 'Old Student', department: 'Soil Science', regNumber: 'OLD/2024/0001' });
+    const { cb, done } = await googleOnboard('claim-code', {
+      fullName: 'Old Student',
+      department: 'Soil Science',
+      regNumber: 'OLD/2024/0001'
+    });
+    expect(cb.location).toContain('/complete-profile');
+    expect(done.status).toBe(409);
+    expect(done.body.code).toBe('NEEDS_CLAIM');
   });
 
-  test('complete-profile refuses a taken registration number (no silent takeover)', async () => {
-    jar.clear();
-    const dup = await api('/api/auth/register', {
+  test('explicit confirmation links Google to the existing records', async () => {
+    const done = await api('/api/auth/google/complete', {
       method: 'POST',
       body: JSON.stringify({
-        fullName: 'Copy Cat',
-        department: 'Agric',
-        regNumber: 'LNK/2024/0001',
-        password: 'copypass123',
-        confirmPassword: 'copypass123'
+        fullName: 'Old Student',
+        department: 'Soil Science',
+        regNumber: 'OLD/2024/0001',
+        claimExisting: true
       })
     });
-    expect(dup.status).toBe(409);
-  });
-
-  test('callback rejects missing code and provider denials', async () => {
-    jar.clear();
-    await api('/api/auth/google?intent=login');
-    const state = jar.get('g_state') ?? '';
-    const noCode = await api(`/api/auth/google/callback?state=${state}`);
-    expect(noCode.status).toBe(302);
-    expect(noCode.location).toContain('invalid_request');
-    const denied = await api('/api/auth/google/callback?error=access_denied&state=' + state);
-    expect(denied.status).toBe(302);
-    expect(denied.location).toContain('access_denied');
-  });
-
-  test('google user owns only their own semesters; logout ends the session', async () => {
-    // Currently linked Google identity belongs to LNK/2024/0001 from the link test.
-    jar.clear();
-    await api('/api/auth/google?intent=login');
-    const state = jar.get('g_state') ?? '';
-    const cb = await api(`/api/auth/google/callback?code=test-code&state=${state}`);
-    expect(cb.location).toContain('/dashboard');
-    // Session persists like password login.
-    expect((await api('/api/auth/me')).status).toBe(200);
-    const created = await api('/api/semesters', {
+    expect(done.status).toBe(200);
+    expect(done.body.claimed).toBe(true);
+    const me = await api('/api/auth/me');
+    expect(me.status).toBe(200);
+    expect(me.body.user).toMatchObject({ regNumber: 'OLD/2024/0001', googleEmail: 'google.student@example.com' });
+    // Records attach to the claimed account going forward.
+    const saved = await api('/api/semesters', {
       method: 'POST',
       body: JSON.stringify({ level: '100', term: 'First Semester', courses: [{ code: 'GNS 101', units: 2, grade: 'A' }] })
     });
-    expect(created.status).toBe(201);
-    const mine = await api('/api/semesters');
-    expect((mine.body.semesters as unknown[]).length).toBeGreaterThanOrEqual(1);
-    // A different password student sees none of it and cannot open it.
-    jar.clear();
-    const other = await api('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        fullName: 'Other Student',
-        department: 'Agric',
-        regNumber: 'OTH/2024/0001',
-        password: 'otherpass123',
-        confirmPassword: 'otherpass123'
-      })
-    });
-    expect(other.status).toBe(201);
-    const otherList = await api('/api/semesters');
-    expect((otherList.body.semesters as unknown[])).toHaveLength(0);
-    const semId = (mine.body.semesters as Array<{ id: string }>)[0].id;
-    expect((await api(`/api/semesters/${semId}`)).status).toBe(404);
-    // Logout after Google login ends the session; password login still works.
-    jar.clear();
-    await api('/api/auth/google?intent=login');
-    const s2 = jar.get('g_state') ?? '';
-    await api(`/api/auth/google/callback?code=test-code&state=${s2}`);
+    expect(saved.status).toBe(201);
+  });
+});
+
+describe('sessions and profile', () => {
+  test('session persists, profile edits identity fields but never email or reg number', async () => {
+    await googleOnboard('profile-code', { fullName: 'Profile Student', department: 'Botany', regNumber: 'PRF/2024/0001' });
     expect((await api('/api/auth/me')).status).toBe(200);
+    const patch = await api('/api/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ fullName: 'Renamed Student', department: 'Zoology', regNumber: 'HACKED/1', googleEmail: 'evil@x.com' })
+    });
+    expect(patch.status).toBe(200);
+    expect(patch.body.user).toMatchObject({ fullName: 'Renamed Student', department: 'Zoology', regNumber: 'PRF/2024/0001' });
+    expect((patch.body.user as { googleEmail: string }).googleEmail).toBe('google.student@example.com');
+    expect((await api('/api/auth/profile', { method: 'PATCH', body: JSON.stringify({}) })).status).toBe(400);
+  });
+
+  test('logout clears the session and protected routes refuse', async () => {
     expect((await api('/api/auth/logout', { method: 'POST' })).status).toBe(200);
     expect((await api('/api/auth/me')).status).toBe(401);
+    expect((await api('/api/semesters')).status).toBe(401);
+  });
+});
+
+describe('ownership across google users', () => {
+  test('one google user cannot touch another google user semester', async () => {
+    await googleOnboard('owner-code', { fullName: 'Owner Student', department: 'Physics', regNumber: 'OWN/2024/0001' });
+    const created = await api('/api/semesters', {
+      method: 'POST',
+      body: JSON.stringify({ level: '200', term: 'First Semester', courses: [{ code: 'PHY 201', units: 3, grade: 'B' }] })
+    });
+    expect(created.status).toBe(201);
+    const semId = (created.body as { id: string }).id;
+    await googleOnboard('stranger-code', { fullName: 'Stranger Student', department: 'Maths', regNumber: 'STG/2024/0001' });
+    const list = await api('/api/semesters');
+    expect((list.body.semesters as unknown[])).toHaveLength(0);
+    expect((await api(`/api/semesters/${semId}`)).status).toBe(404);
     expect(
-      (
-        await api('/api/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ regNumber: 'LNK/2024/0001', password: 'linkpass123' })
-        })
-      ).status
-    ).toBe(200);
+      (await api(`/api/semesters/${semId}`, { method: 'PUT', body: JSON.stringify({ level: '200', term: 'First Semester', courses: [] }) }))
+        .status
+    ).toBe(404);
+    expect((await api(`/api/semesters/${semId}`, { method: 'DELETE' })).status).toBe(404);
+  });
+});
+
+describe('retired password surface', () => {
+  test('no password routes remain', async () => {
+    jar.clear();
+    for (const [method, path, body] of [
+      ['POST', '/api/auth/register', { fullName: 'X', department: 'Y', regNumber: 'Z', password: 'p', confirmPassword: 'p' }],
+      ['POST', '/api/auth/login', { regNumber: 'Z', password: 'p' }],
+      ['POST', '/api/auth/password', { currentPassword: 'a', newPassword: 'b', confirmPassword: 'b' }],
+      ['POST', '/api/auth/password/setup', { newPassword: 'b', confirmPassword: 'b' }],
+      ['POST', '/api/auth/google/disconnect', {}]
+    ] as Array<[string, string, Record<string, string>]>) {
+      const r = await api(path, { method, body: JSON.stringify(body) });
+      expect(r.status).toBe(404);
+    }
   });
 });

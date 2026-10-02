@@ -1,4 +1,4 @@
-# Frequency - V1 (auth + dashboard + GP flow)
+# Frequency - V1 (Google-only auth + dashboard + GP flow)
 
 Frequency student tracker. Cream/deep-teal/orange mobile-first UI (430px shell,
 widening to 640px on tablets and 780px on desktops),
@@ -11,7 +11,7 @@ TypeScript + React throughout.
   sticky action bar, `prefers-reduced-motion` support). Screens in `src/screens/`,
   shared pieces in `src/components/` (`Icons`, `Bookshelf` hero, `ui` primitives).
 - **server/**: Node 20+ + Express 4 + TypeScript (tsx) + built-in `node:sqlite`
-  file DB -> Postgres later. Auth: bcryptjs + JWT in HttpOnly cookie.
+  file DB locally, Neon Postgres in production. Auth: Google OAuth only + JWT in HttpOnly cookie. No passwords anywhere.
 - **shared/**: `src/gradeScale.ts` (configurable points) + `src/calc.ts` +
   `src/schemas.ts` + `src/classification.ts`, imported by both sides.
   The client math adapter (`client/src/lib/gpa.ts`) re-exports these, no duplicated logic.
@@ -19,7 +19,7 @@ TypeScript + React throughout.
 
 ## Data models
 
-- `users(id, full_name, department, reg_number UNIQUE, password_hash, google_id UNIQUE NULL, google_email NULL, has_password, created_at)`
+- `users(id, full_name, department, reg_number UNIQUE, google_id UNIQUE NULL, google_email NULL, created_at)`
 - `semesters(id, user_id FK, level, term, total_units, total_points, gp, UNIQUE(user_id, level, term))`
 - `courses(id, semester_id FK, code, title?, units, grade, quality_points)`
 
@@ -35,38 +35,42 @@ No seed or demo records: every number on screen comes from the API.
 
 ## Routing
 
-- Frontend: `/` `/login` `/register` `/dashboard` `/profile` `/semesters/:id`
+- Frontend: `/` `/login` `/complete-profile` `/dashboard` `/profile` `/semesters/:id`
   `/semesters/:id/edit` and the GP wizard `/semesters/new` (setup) → `courses`
-  → `review` → `result`, guarded by auth + draft state.
+  → `review` → `result`, guarded by auth + draft state. (`/register` redirects to `/login`.)
 - Backend: see `docs/api-contract.md`.
 
-## Google Sign-In (additional method, password login unchanged)
+## Authentication (Google only, no passwords)
 
-- Login shows `Continue with Google` alongside reg-number + password. Backend handles
-  the OAuth code flow, verifies the ID token server-side, and never trusts client IDs.
+- Landing and login show a single `Continue with Google`. The same button signs in
+  returning students and onboards new ones. Backend runs the OAuth code flow,
+  verifies the ID token server-side, and never trusts client-supplied IDs.
 - First-time Google users land on `/complete-profile` to add name, department, and
-  reg-number once. The Google subject (`sub`) is the link key, never the email.
-- Existing students link from Profile via `Connect Google`. Disconnect is blocked
-  until a password is set, so the account is never locked out.
-- Google-only accounts show `Set a Password` in Profile instead of `Change Password`.
+  reg-number once. The Google subject (`sub`) is the link key, never the email;
+  the verified email is stored from Google and shown read-only.
+- Owner of a legacy (pre-Google) account types its registration number during
+  onboarding, sees an explicit takeover warning, and confirms with a checkbox.
+  Records stay on the same user row, so semesters are never orphaned.
+- Profile shows name, department, reg-number, and Google email. No passwords, no
+  reset flows, no disconnect (Google is the only method).
 - Setup: set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (see
-  `.env.example`). Without them, `/api/auth/google` redirects back to login with
-  `?error=google_not_configured` and password login keeps working.
+  `.env.example`, values stay in Vercel env, never committed). Without them,
+  `/api/auth/google` redirects back to login with `?error=google_not_configured`.
 
 ## Validation (Zod, server is authoritative)
 
-- regNumber: trimmed, 3-32 chars, unique. Password: min 8 chars. Never store plaintext.
+- regNumber: trimmed, 3-32 chars, unique. No passwords exist in the system.
 - course: code required, units int 1-12, grade must exist in scale, title optional.
 - Duplicate `(user, level, term)` -> 409. Edit updates the record in place.
-- Profile: name/department editable; regNumber immutable; password change verifies current + bcrypt-hashes the new one.
+- Profile: name/department editable; regNumber and Google email immutable.
 
 ## V1 flow
 
-Landing -> Register/Login -> Dashboard -> Calculate your GPA -> setup (count, level, semester)
+Landing -> Continue with Google -> (new: Complete Profile) -> Dashboard -> Calculate your GPA -> setup (count, level, semester)
 -> course entry (running units, sticky review bar) -> review (Edit / Save GPA)
 -> result (semester GPA + live CGPA) -> Dashboard. Semester rows open details with
 per-course points, Edit (add/remove supported, server recalculates) and Delete
-(confirmed, cascades, CGPA recalculated). Profile edits info, changes password, logs out.
+(confirmed, cascades, CGPA recalculated). Profile edits name/department and logs out.
 
 ## Run
 
@@ -85,6 +89,7 @@ per-course points, Edit (add/remove supported, server recalculates) and Delete
 
 ## Test
 
-- `npm test` (vitest: calc + validation + classification + profile/password units,
-  API flows on scratch DBs: auth lifecycle, submit, read-one, edit, delete,
-  duplicate 409, invalid 400, CGPA effects, per-student ownership)
+- `npm test` (vitest: calc + validation + classification + onboarding-schema units,
+  Google API flows on scratch DBs: initiation, state guards, onboarding, legacy
+  claim, sessions, ownership, retired-route 404s, plus submit, read-one, edit,
+  delete, duplicate 409, invalid 400, CGPA effects, per-student ownership)

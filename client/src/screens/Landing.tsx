@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
 import { Bookshelf } from '../components/Bookshelf.js';
+import { GoogleButton } from './Auth.js';
 
 export function Landing() {
   return (
@@ -15,15 +15,8 @@ export function Landing() {
       </h1>
       <p className="hero-p">Enter your courses once, and Frequency keeps the record.</p>
 
-      <Link className="btn btn--primary" to="/register" style={{ textDecoration: 'none' }}>
-        Get Started
-      </Link>
-      <p className="center muted mt16">
-        Already have an account?{' '}
-        <Link className="linklike" to="/login">
-          Log In
-        </Link>
-      </p>
+      <GoogleButton />
+      <p className="center muted mt16">One tap signs you in with Google. New students complete a short profile next.</p>
 
       <div className="hero">
         <Bookshelf />

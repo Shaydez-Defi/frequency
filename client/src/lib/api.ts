@@ -4,7 +4,6 @@ export interface PublicUser {
   department: string;
   regNumber: string;
   googleEmail: string | null;
-  hasPassword: boolean;
 }
 
 export interface SemesterRecord {
@@ -35,10 +34,12 @@ export interface CoursePayload {
 export class ApiError extends Error {
   status: number;
   details?: Record<string, string[]>;
-  constructor(status: number, message: string, details?: Record<string, string[]>) {
+  code?: string;
+  constructor(status: number, message: string, details?: Record<string, string[]>, code?: string) {
     super(message);
     this.status = status;
     this.details = details;
+    this.code = code;
   }
 }
 
@@ -50,17 +51,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(res.status, (data as { error?: string }).error ?? 'Something went wrong.', (data as { details?: Record<string, string[]> }).details);
+    throw new ApiError(
+      res.status,
+      (data as { error?: string }).error ?? 'Something went wrong.',
+      (data as { details?: Record<string, string[]> }).details,
+      (data as { code?: string }).code
+    );
   }
   return data as T;
 }
 
 export const api = {
   me: () => request<{ user: PublicUser }>('/api/auth/me'),
-  register: (body: { fullName: string; department: string; regNumber: string; password: string; confirmPassword: string }) =>
-    request<{ user: PublicUser }>('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
-  login: (body: { regNumber: string; password: string }) =>
-    request<{ user: PublicUser }>('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   logout: () => request<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
   semesters: () =>
     request<{ semesters: SemesterRecord[]; cgpa: number | null; totalUnits: number; totalPoints: number }>('/api/semesters'),
@@ -72,11 +74,7 @@ export const api = {
   deleteSemester: (id: string) => request<{ ok: true }>(`/api/semesters/${id}`, { method: 'DELETE' }),
   updateProfile: (body: { fullName?: string; department?: string }) =>
     request<{ user: PublicUser }>('/api/auth/profile', { method: 'PATCH', body: JSON.stringify(body) }),
-  changePassword: (body: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
-    request<{ ok: true }>('/api/auth/password', { method: 'POST', body: JSON.stringify(body) }),
-  setupPassword: (body: { newPassword: string; confirmPassword: string }) =>
-    request<{ ok: true }>('/api/auth/password/setup', { method: 'POST', body: JSON.stringify(body) }),
-  googleComplete: (body: { fullName: string; department: string; regNumber: string }) =>
-    request<{ user: PublicUser }>('/api/auth/google/complete', { method: 'POST', body: JSON.stringify(body) }),
-  googleDisconnect: () => request<{ ok: true; user: PublicUser }>('/api/auth/google/disconnect', { method: 'POST' })
+  googlePending: () => request<{ pending: { email: string; name: string } }>('/api/auth/google/pending'),
+  googleComplete: (body: { fullName: string; department: string; regNumber: string; claimExisting?: boolean }) =>
+    request<{ user: PublicUser; claimed?: boolean }>('/api/auth/google/complete', { method: 'POST', body: JSON.stringify(body) })
 };

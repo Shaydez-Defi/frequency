@@ -25,8 +25,9 @@ export function googleAuthUrl(state: string): string {
 }
 
 export async function exchangeCode(code: string): Promise<string> {
-  // Test seam: never touches Google's servers when stubbed.
-  if (process.env.GOOGLE_TEST_SUB) return 'test-id-token';
+  // Test seam: never touches Google's servers when stubbed. The code travels
+  // inside the stub token so each test identity gets a stable, distinct sub.
+  if (process.env.GOOGLE_TEST_SUB) return `test-id-token:${code}`;
   const cfg = googleConfig();
   if (!cfg) throw new Error('Google sign-in is not configured.');
   const client = new OAuth2Client(cfg.clientId, cfg.clientSecret, cfg.redirectUri);
@@ -37,9 +38,12 @@ export async function exchangeCode(code: string): Promise<string> {
 
 export async function verifyIdentity(idToken: string): Promise<GoogleIdentity> {
   // Test seam: deterministic verified identity for the sandbox suite.
+  // The default code keeps the historic sub; any other code gets a distinct
+  // stable sub so multi-user tests never share one Google identity.
   if (process.env.GOOGLE_TEST_SUB) {
+    const suffix = idToken === 'test-id-token:test-code' || idToken === 'test-id-token' ? '' : `:${idToken.replace(/^test-id-token:/, '')}`;
     return {
-      sub: process.env.GOOGLE_TEST_SUB,
+      sub: `${process.env.GOOGLE_TEST_SUB}${suffix}`,
       email: process.env.GOOGLE_TEST_EMAIL ?? 'test.student@example.com',
       emailVerified: true,
       name: process.env.GOOGLE_TEST_NAME ?? 'Test Student'

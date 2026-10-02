@@ -55,8 +55,12 @@ async function sqliteConn(): Promise<SqliteDb> {
     if (!names.has('google_email')) {
       db.exec(`ALTER TABLE users ADD COLUMN google_email TEXT`);
     }
-    if (!names.has('has_password')) {
-      db.exec(`ALTER TABLE users ADD COLUMN has_password INTEGER NOT NULL DEFAULT 1`);
+    // Google-only auth: application passwords are gone. Records stay, secrets go.
+    if (names.has('password_hash')) {
+      db.exec(`ALTER TABLE users DROP COLUMN password_hash`);
+    }
+    if (names.has('has_password')) {
+      db.exec(`ALTER TABLE users DROP COLUMN has_password`);
     }
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id)`);
     sqlite = db;
@@ -107,10 +111,12 @@ async function ensurePg(): Promise<void> {
       for (const statement of schema.split(';')) {
         if (statement.trim().length > 0) await pgPool().query(statement);
       }
-      // Idempotent upgrades for databases created before Google linking existed.
+      // Idempotent upgrades for databases created before Google linking existed,
+      // plus removal of the retired application-password columns. Records stay.
       await pgPool().query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT`);
       await pgPool().query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_email TEXT`);
-      await pgPool().query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_password INTEGER NOT NULL DEFAULT 1`);
+      await pgPool().query(`ALTER TABLE users DROP COLUMN IF EXISTS password_hash`);
+      await pgPool().query(`ALTER TABLE users DROP COLUMN IF EXISTS has_password`);
       await pgPool().query(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_unique ON users(google_id)`);
     })();
   }

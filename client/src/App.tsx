@@ -2,7 +2,7 @@ import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext.js';
 import { DraftProvider, useDraft } from './semesters/draft.js';
 import { Landing } from './screens/Landing.js';
-import { Login, Register } from './screens/Auth.js';
+import { Login } from './screens/Auth.js';
 import { CompleteProfile } from './screens/CompleteProfile.js';
 import { Dashboard } from './screens/Dashboard.js';
 import { EditSemester } from './screens/EditSemester.js';
@@ -38,7 +38,7 @@ export function App() {
     <div className="app">
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/complete-profile" element={<CompleteProfile />} />
         <Route

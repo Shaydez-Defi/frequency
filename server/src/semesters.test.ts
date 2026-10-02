@@ -17,23 +17,50 @@ let base = '';
 
 let child: ChildProcess | null = null;
 let dir = '';
-const jars: Record<string, string> = { default: '' };
+const jars: Record<string, Map<string, string>> = { default: new Map() };
+
+function cookieHeader(jar: string): string {
+  return [...jars[jar].entries()].map(([k, v]) => `${k}=${v}`).join('; ');
+}
 
 async function api(path: string, options: RequestInit = {}, jar = 'default') {
+  if (!jars[jar]) jars[jar] = new Map();
   const res = await fetch(base + path, {
     ...options,
+    redirect: 'manual',
     headers: {
       'Content-Type': 'application/json',
-      ...(jars[jar] ? { Cookie: jars[jar] } : {}),
+      ...(jars[jar].size > 0 ? { Cookie: cookieHeader(jar) } : {}),
       ...(options.headers ?? {})
     }
   });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   const setCookies = res.headers.getSetCookie?.() ?? [];
-  const token = setCookies.find((c) => c.startsWith('token='));
-  if (token) jars[jar] = token.split(';')[0];
-  if (path === '/api/auth/logout' && res.ok) jars[jar] = '';
-  return { status: res.status, body };
+  for (const c of setCookies) {
+    const pair = c.split(';')[0];
+    const eq = pair.indexOf('=');
+    if (eq > 0) {
+      const name = pair.slice(0, eq).trim();
+      const value = pair.slice(eq + 1).trim();
+      if (/expires=thu, 01 jan 1970/i.test(c) || value === '') jars[jar].delete(name);
+      else jars[jar].set(name, decodeURIComponent(value));
+    }
+  }
+  return { status: res.status, body, location: res.headers.get('location') ?? '' };
+}
+
+// Google-only auth: each code maps to a distinct stub identity.
+async function onboard(
+  jar: string,
+  code: string,
+  profile: { fullName: string; department: string; regNumber: string }
+) {
+  jars[jar] = new Map();
+  await api('/api/auth/google', {}, jar);
+  const state = jars[jar].get('g_state') ?? '';
+  await api(`/api/auth/google/callback?code=${code}&state=${state}`, {}, jar);
+  const done = await api('/api/auth/google/complete', { method: 'POST', body: JSON.stringify(profile) }, jar);
+  if (done.status !== 201) throw new Error(`onboard failed: ${done.status} ${JSON.stringify(done.body)}`);
 }
 
 async function waitForHealth(): Promise<void> {
@@ -72,7 +99,13 @@ beforeAll(async () => {
       ...process.env,
       PORT: String(port),
       JWT_SECRET: 'test-secret',
-      DATABASE_URL: `file:${join(dir, 'test.db')}`
+      DATABASE_URL: `file:${join(dir, 'test.db')}`,
+      GOOGLE_CLIENT_ID: 'test-client-id',
+      GOOGLE_CLIENT_SECRET: 'test-client-secret',
+      GOOGLE_REDIRECT_URI: 'http://localhost/callback',
+      GOOGLE_TEST_SUB: 'google-sub-flow',
+      GOOGLE_TEST_EMAIL: 'flow.student@example.com',
+      GOOGLE_TEST_NAME: 'Flow Student'
     },
     stdio: 'ignore'
   });
@@ -116,23 +149,20 @@ afterAll(async () => {
 });
 
 describe('semester submission flow', () => {
-  test('registers a student for the flow', async () => {
-    const r = await api('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({
-        fullName: 'Flow Student',
-        department: 'Agric Economics',
-        regNumber: 'TST/FLOW01',
-        password: 'password1234',
-        confirmPassword: 'password1234'
-      })
+  test('onboards a student through Google for the flow', async () => {
+    await onboard('default', 'flow-a', {
+      fullName: 'Flow Student',
+      department: 'Agric Economics',
+      regNumber: 'TST/FLOW01'
     });
-    expect(r.status).toBe(201);
+    const me = await api('/api/auth/me');
+    expect(me.status).toBe(200);
+    expect(me.body.user).toMatchObject({ regNumber: 'TST/FLOW01' });
   });
 
   test('rejects unauthenticated semester reads', async () => {
     const saved = jars.default;
-    jars.default = '';
+    jars.default = new Map();
     const r = await api('/api/semesters');
     expect(r.status).toBe(401);
     jars.default = saved;
@@ -239,21 +269,11 @@ describe('semester submission flow', () => {
   });
 
   test('keeps each student’s semesters private', async () => {
-    const reg = await api(
-      '/api/auth/register',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          fullName: 'Second Student',
-          department: 'Crop Science',
-          regNumber: 'TST/FLOW02',
-          password: 'password1234',
-          confirmPassword: 'password1234'
-        })
-      },
-      'second'
-    );
-    expect(reg.status).toBe(201);
+    await onboard('second', 'flow-b', {
+      fullName: 'Second Student',
+      department: 'Crop Science',
+      regNumber: 'TST/FLOW02'
+    });
     // A fresh student starts with no records, even though another exists.
     const empty = await api('/api/semesters', {}, 'second');
     expect(empty.status).toBe(200);
@@ -289,7 +309,7 @@ describe('semester submission flow', () => {
     expect((await api(`/api/semesters/${other[0].id}`)).status).toBe(404);
     expect((await api('/api/semesters/abc')).status).toBe(404);
     const saved = jars.default;
-    jars.default = '';
+    jars.default = new Map();
     expect((await api(`/api/semesters/${mine}`)).status).toBe(401);
     jars.default = saved;
   });
